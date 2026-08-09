@@ -346,7 +346,7 @@ const TABS = [
   { id: 'courses',  label: '📚 강의' },
   { id: 'fitness',  label: '💪 운동' },
   { id: 'mindpick', label: '📱 마인드픽' },
-  { id: 'military', label: '🪖 군대' }
+  { id: 'military', label: '🪖 전역' }
 ];
 
 /* 행동 하나당 경험치. 어려운 일일수록 크게. */
@@ -486,10 +486,27 @@ async function api(path, options) {
 
 async function loadAll(force) {
   if (DATA && !force) return DATA;
-  const lists = await Promise.all(ENDPOINTS.map(n => api(n)));
+  const [lists, settings] = await Promise.all([
+    Promise.all(ENDPOINTS.map(n => api(n))),
+    api('settings').catch(() => ({}))
+  ]);
   DATA = {};
   ENDPOINTS.forEach((n, i) => { DATA[n] = Array.isArray(lists[i]) ? lists[i] : []; });
+  DATA.settings = settings || {};
   return DATA;
+}
+
+/* 복무 진행 상황. 입대일·전역일이 없으면 null. */
+function service(d) {
+  const s = d.settings || {};
+  if (!s.service_start || !s.service_end) return null;
+  const start = new Date(s.service_start + 'T00:00:00');
+  const end = new Date(s.service_end + 'T00:00:00');
+  const now = new Date(today() + 'T00:00:00');
+  const day = Math.floor((now - start) / 86400000) + 1;   // 입대일이 1일차
+  const left = Math.ceil((end - now) / 86400000);
+  const totalDays = Math.floor((end - start) / 86400000) + 1;
+  return { start: s.service_start, end: s.service_end, day, left, totalDays, pct: pct(day, totalDays) };
 }
 
 async function save(name, body, msg) {
@@ -633,6 +650,35 @@ function openEdit(title, fields, record, endpoint) {
     for (const f of fields) if (!(f.key in body) && !f.required) body[f.key] = '';
     await patch(endpoint, record.id, body, '수정했어');
     back.remove();
+  }, '저장'));
+
+  back.append(sheet);
+  back.onclick = (e) => { if (e.target === back) back.remove(); };
+  document.body.append(back);
+  requestAnimationFrame(() => back.classList.add('open'));
+}
+
+/* 입대일 · 전역일은 키-값 설정이라 별도 시트를 쓴다. */
+function openServiceDates(d) {
+  const s = d.settings || {};
+  const back = el('div', 'sheetback');
+  const sheet = el('div', 'sheet');
+  const head = el('div', 'sheethead');
+  head.append(el('h3', null, '복무 날짜'));
+  const x = el('button', 'mini', '닫기');
+  x.onclick = () => back.remove();
+  head.append(x);
+  sheet.append(head);
+
+  sheet.append(form([
+    { key: 'service_start', label: '입대일', type: 'date', value: s.service_start || '' },
+    { key: 'service_end', label: '전역일', type: 'date', value: s.service_end || '' }
+  ], async (body) => {
+    await api('settings', { method: 'POST', body: JSON.stringify(body) });
+    DATA = null;
+    toast('저장했어', 'good');
+    back.remove();
+    render();
   }, '저장'));
 
   back.append(sheet);
@@ -881,6 +927,7 @@ function stats(d) {
 
   const applied = d.notes.filter(n => n.applied).length;
   const solved  = d.blockers.filter(b => b.status === 'solved').length;
+  const sv      = service(d);
 
   return [
     { emo: '📝', label: '노트 적용', pct: d.notes.length ? pct(applied, d.notes.length) : null, detail: d.notes.length ? `${applied}/${d.notes.length}` : '없음' },
@@ -891,7 +938,7 @@ function stats(d) {
     { emo: '📖', label: '독서',      pct: readPct,                              detail: reading.length ? `${reading.length}권 읽는 중` : '없음' },
     { emo: '📱', label: '마인드픽',   pct: pct(month, 12),                       detail: `30일 ${month}개` },
     { emo: '🤝', label: '사람',      pct: d.people.length ? pct(d.people.filter(p => p.keep).length, d.people.length) : null, detail: d.people.length ? `${d.people.length}명` : '없음' },
-    { emo: '🪖', label: '군대',      pct: d.military.length ? pct(mDone, d.military.length) : null, detail: d.military.length ? `${mDone}/${d.military.length}` : '없음' }
+    { emo: '🪖', label: '전역',      pct: sv ? sv.pct : null, detail: sv ? `D-${num(sv.left)}` : (d.military.length ? `${mDone}/${d.military.length}` : '없음') }
   ];
 }
 
@@ -1123,7 +1170,37 @@ function viewMilitary(view, d) {
   const todo = rows.filter(r => r.status !== 'done')
     .sort((a, b) => (a.target_date || '9999').localeCompare(b.target_date || '9999'));
 
-  const c = card('군대 준비');
+  /* 전역 카운트다운 */
+  const sv = service(d);
+  const dday = el('div', 'card');
+  if (sv) {
+    const row = el('div', 'hero');
+    const rw = el('div', 'lvlring');
+    rw.append(ring(sv.pct, 86, 8));
+    const nn = el('div', 'num');
+    nn.append(el('b', null, String(sv.left)), el('span', null, 'D-DAY'));
+    rw.append(nn);
+    const body = el('div', 'herobody');
+    body.append(el('div', 'xp', `복무 ${num(sv.day)}일차`));
+    body.append(el('div', 'next', `${sv.start} → ${sv.end} · ${sv.pct}% 지남`));
+    const tr = el('div', 'xptrack');
+    const tf = el('div', 'xpfill');
+    tf.style.width = sv.pct + '%';
+    tr.append(tf);
+    body.append(tr);
+    row.append(rw, body);
+    dday.append(row);
+  } else {
+    dday.append(el('h2', null, '전역'));
+    dday.append(el('div', 'empty', '입대일과 전역일을 넣으면 카운트다운이 뜬다.'));
+  }
+  const setBtn = el('button', 'mini', sv ? '날짜 수정' : '날짜 설정');
+  setBtn.style.marginTop = '14px';
+  setBtn.onclick = () => openServiceDates(d);
+  dday.append(setBtn);
+  view.append(dday);
+
+  const c = card('복무 중 할 일');
   bar(c, '진행률', done.length, rows.length, `${done.length} / ${rows.length}개`);
   if (!rows.length) c.append(el('div', 'empty', '등록된 항목 없음'));
   todo.forEach(r => {
@@ -1145,8 +1222,8 @@ function viewMilitary(view, d) {
 
   const f = card();
   f.append(collapsed('＋ 할 일 추가', form([
-    { key: 'task', label: '할 일', placeholder: '예) 신체검사 예약' },
-    { key: 'category', label: '분류', placeholder: '예) 서류', half: true },
+    { key: 'task', label: '할 일', placeholder: '예) 전역 전까지 포트폴리오 3개' },
+    { key: 'category', label: '분류', placeholder: '예) 자기계발', half: true },
     { key: 'priority', label: '우선순위', type: 'select', options: [['high','높음'],['medium','보통'],['low','낮음']], half: true },
     { key: 'target_date', label: '목표일', type: 'date' },
     { key: 'notes', label: '메모', type: 'textarea' }
