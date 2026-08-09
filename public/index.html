@@ -47,6 +47,26 @@
     overscroll-behavior-y: contain;
   }
 
+  /* 화면 위쪽에 은은한 빛. 고정이라 스크롤해도 배경에 남는다. */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(760px 460px at 12% -8%,  color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%),
+      radial-gradient(620px 420px at 92% 4%,   color-mix(in srgb, var(--streak) 14%, transparent), transparent 68%),
+      radial-gradient(680px 520px at 50% 34%,  color-mix(in srgb, var(--done)   10%, transparent), transparent 72%);
+  }
+
+  /* 카드가 아래에서 살짝 올라오며 나타난다. --i 로 순서를 준다. */
+  @keyframes riseIn {
+    from { opacity: 0; transform: translateY(14px) scale(.985); }
+    to   { opacity: 1; transform: none; }
+  }
+  main > * {
+    animation: riseIn .42s cubic-bezier(.2,.8,.3,1) both;
+    animation-delay: calc(var(--i, 0) * 45ms);
+  }
+
   /* ---------- 헤더 ---------- */
 
   header {
@@ -55,18 +75,29 @@
     backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--line);
   }
-  .bar { display: flex; align-items: center; gap: 10px; padding: 12px 16px 0; }
-  .bar h1 { margin: 0; font-size: .95rem; font-weight: 600; letter-spacing: -.01em; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 13px 16px 0; }
+  .bar h1 {
+    margin: 0; font-size: 1rem; font-weight: 750; letter-spacing: -.02em;
+    background: linear-gradient(92deg, #fff 10%, #9ec5f4 60%, #86b6ef);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
   .bar .spacer { flex: 1; }
 
   .streakchip {
     display: flex; align-items: center; gap: 5px;
-    background: color-mix(in srgb, var(--streak) 16%, transparent);
-    border: 1px solid color-mix(in srgb, var(--streak) 40%, transparent);
+    background: color-mix(in srgb, var(--streak) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--streak) 45%, transparent);
     color: var(--streak);
-    border-radius: 999px; padding: 4px 11px;
-    font-size: .78rem; font-weight: 650;
+    border-radius: 999px; padding: 5px 12px;
+    font-size: .78rem; font-weight: 750;
     font-variant-numeric: tabular-nums;
+    box-shadow: 0 0 16px -4px color-mix(in srgb, var(--streak) 60%, transparent);
+  }
+  .streakchip.hot { animation: emberPulse 2.4s ease-in-out infinite; }
+  @keyframes emberPulse {
+    0%, 100% { box-shadow: 0 0 14px -5px color-mix(in srgb, var(--streak) 55%, transparent); }
+    50%      { box-shadow: 0 0 22px -2px color-mix(in srgb, var(--streak) 85%, transparent); }
   }
 
   nav {
@@ -90,10 +121,21 @@
   /* ---------- 카드 ---------- */
 
   .card {
-    background: var(--card);
+    position: relative;
+    background:
+      linear-gradient(168deg, color-mix(in srgb, #fff 4%, transparent), transparent 46%),
+      var(--card);
     border: 1px solid var(--line);
     border-radius: var(--r);
     padding: 16px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 12px 28px -18px rgba(0,0,0,.9);
+  }
+  /* 카드 윗변에 가느다란 빛줄기 */
+  .card::before {
+    content: '';
+    position: absolute; left: 14%; right: 14%; top: -1px; height: 1px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 55%, transparent), transparent);
+    opacity: .55;
   }
   .card > h2 {
     margin: 0 0 14px; font-size: .8rem; font-weight: 650;
@@ -102,8 +144,33 @@
 
   /* ---------- 레벨 히어로 ---------- */
 
+  /* 레벨 카드는 더 세게 — 여기가 첫인상이다 */
+  .herocard {
+    background:
+      radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 58%),
+      radial-gradient(120% 140% at 100% 100%, color-mix(in srgb, var(--streak) 13%, transparent), transparent 58%),
+      var(--card);
+    border-color: color-mix(in srgb, var(--accent) 26%, var(--line));
+    overflow: hidden;
+  }
+  .herocard::after {
+    content: '';
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(60% 70% at 18% 20%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%);
+  }
+  .herocard > * { position: relative; z-index: 1; }
+
   .hero { display: flex; align-items: center; gap: 16px; }
-  .lvlring { position: relative; flex: 0 0 auto; }
+  .lvlring { position: relative; flex: 0 0 auto; filter: drop-shadow(0 0 12px color-mix(in srgb, var(--accent) 40%, transparent)); }
+
+  .tier {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: .7rem; font-weight: 750; letter-spacing: .06em;
+    padding: 3px 10px; border-radius: 999px; margin-bottom: 6px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  }
   .lvlring .num {
     position: absolute; inset: 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -115,8 +182,26 @@
   .herobody { flex: 1; min-width: 0; }
   .herobody .xp { font-size: .95rem; font-weight: 650; font-variant-numeric: tabular-nums; }
   .herobody .next { font-size: .76rem; color: var(--muted); margin-top: 2px; }
-  .xptrack { height: 8px; background: var(--track); border-radius: 4px; overflow: hidden; margin-top: 10px; }
-  .xpfill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .5s cubic-bezier(.2,.7,.3,1); }
+  .xptrack {
+    height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; margin-top: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.4) inset;
+  }
+  .xpfill {
+    height: 100%; border-radius: 5px;
+    background: linear-gradient(90deg, var(--accent), #6fb2ff 65%, #9ad0ff);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 70%, transparent);
+    transition: width .8s cubic-bezier(.2,.8,.3,1);
+    position: relative; overflow: hidden;
+  }
+  /* 게이지 위를 훑고 지나가는 빛 */
+  .xpfill::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,.5) 50%, transparent 80%);
+    transform: translateX(-100%);
+    animation: sweep 2.6s ease-in-out 0.6s infinite;
+  }
+  @keyframes sweep { 0% { transform: translateX(-100%) } 55%, 100% { transform: translateX(220%) } }
 
   /* ---------- 퀘스트 ---------- */
 
@@ -167,7 +252,14 @@
     grid-template-rows: repeat(7, 1fr); grid-auto-columns: 1fr;
     gap: 3px;
   }
-  .heat i { width: auto; aspect-ratio: 1; border-radius: 3px; background: var(--heat-0); display: block; }
+  .heat i {
+    width: auto; aspect-ratio: 1; border-radius: 3px;
+    background: var(--heat-0); display: block;
+    transition: transform .18s;
+  }
+  /* 활동이 많은 칸은 살짝 빛난다 */
+  .heat i.lit { box-shadow: 0 0 8px -1px color-mix(in srgb, var(--accent) 65%, transparent); }
+  .heat i.today { outline: 1.5px solid var(--streak); outline-offset: 1px; }
   .heatlegend { display: flex; align-items: center; gap: 5px; justify-content: flex-end; margin-top: 10px; font-size: .68rem; color: var(--faint); }
   .heatlegend i { width: 9px; height: 9px; border-radius: 2px; display: block; }
 
@@ -175,11 +267,30 @@
 
   .badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
   .badge {
+    position: relative; overflow: hidden;
     background: var(--raised); border-radius: 12px; padding: 12px 8px;
-    text-align: center; opacity: .32; filter: grayscale(1);
-    transition: opacity .2s, filter .2s;
+    text-align: center; opacity: .3; filter: grayscale(1);
+    transition: opacity .2s, filter .2s, transform .2s;
   }
-  .badge.got { opacity: 1; filter: none; border: 1px solid color-mix(in srgb, var(--done) 35%, transparent); }
+  .badge.got {
+    opacity: 1; filter: none;
+    border: 1px solid color-mix(in srgb, var(--done) 40%, transparent);
+    background:
+      radial-gradient(90% 90% at 50% 0%, color-mix(in srgb, var(--done) 18%, transparent), transparent 70%),
+      var(--raised);
+    box-shadow: 0 0 18px -6px color-mix(in srgb, var(--done) 55%, transparent);
+  }
+  .badge.got .e { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--done) 60%, transparent)); }
+  /* 획득한 배지에만 훑고 지나가는 반짝임 */
+  .badge.got::after {
+    content: '';
+    position: absolute; top: 0; bottom: 0; width: 45%;
+    background: linear-gradient(100deg, transparent, rgba(255,255,255,.14), transparent);
+    transform: translateX(-160%);
+    animation: shine 4.5s ease-in-out infinite;
+    animation-delay: calc(var(--b, 0) * 240ms);
+  }
+  @keyframes shine { 0% { transform: translateX(-160%) } 30%, 100% { transform: translateX(320%) } }
   .badge .e { font-size: 1.4rem; line-height: 1; }
   .badge .n { font-size: .68rem; margin-top: 6px; color: var(--muted); line-height: 1.25; }
 
@@ -571,17 +682,37 @@ function card(title) {
   return c;
 }
 
-/* 진행률 링. 크기(px)와 굵기만 받는다. */
+let ringSeq = 0;
+
+/* 진행률 링. 그라데이션 획 + 0에서 차오르는 애니메이션. */
 function ring(value, size, width, color) {
   const r = (size - width) / 2;
   const circ = 2 * Math.PI * r;
   const ns = 'http://www.w3.org/2000/svg';
+  const id = 'rg' + (++ringSeq);
+  const full = value >= 100;
+
   const svg = document.createElementNS(ns, 'svg');
   svg.setAttribute('width', size);
   svg.setAttribute('height', size);
   svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
   svg.style.display = 'block';
   svg.style.transform = 'rotate(-90deg)';
+
+  const defs = document.createElementNS(ns, 'defs');
+  const grad = document.createElementNS(ns, 'linearGradient');
+  grad.setAttribute('id', id);
+  grad.setAttribute('x1', '0'); grad.setAttribute('y1', '0');
+  grad.setAttribute('x2', '1'); grad.setAttribute('y2', '1');
+  const stops = full ? ['#199e70', '#3fd39a'] : ['#3987e5', '#8fc7ff'];
+  stops.forEach((c, i) => {
+    const s = document.createElementNS(ns, 'stop');
+    s.setAttribute('offset', i ? '100%' : '0%');
+    s.setAttribute('stop-color', c);
+    grad.append(s);
+  });
+  defs.append(grad);
+  svg.append(defs);
 
   const bg = document.createElementNS(ns, 'circle');
   bg.setAttribute('cx', size / 2); bg.setAttribute('cy', size / 2); bg.setAttribute('r', r);
@@ -592,16 +723,44 @@ function ring(value, size, width, color) {
   const fg = document.createElementNS(ns, 'circle');
   fg.setAttribute('cx', size / 2); fg.setAttribute('cy', size / 2); fg.setAttribute('r', r);
   fg.setAttribute('fill', 'none');
-  fg.setAttribute('stroke', color || (value >= 100 ? 'var(--done)' : 'var(--accent)'));
+  fg.setAttribute('stroke', color || `url(#${id})`);
   fg.setAttribute('stroke-width', width);
   fg.setAttribute('stroke-linecap', 'round');
   fg.setAttribute('stroke-dasharray', circ);
-  fg.setAttribute('stroke-dashoffset', circ * (1 - Math.min(1, value / 100)));
-  fg.style.transition = 'stroke-dashoffset .6s cubic-bezier(.2,.7,.3,1)';
+  fg.setAttribute('stroke-dashoffset', circ);   // 빈 상태에서 시작
+  fg.style.transition = 'stroke-dashoffset .9s cubic-bezier(.2,.8,.3,1)';
+  fg.style.filter = `drop-shadow(0 0 ${Math.max(3, width * 0.7)}px ${full ? 'rgba(25,158,112,.7)' : 'rgba(57,135,229,.65)'})`;
 
   svg.append(bg, fg);
+  requestAnimationFrame(() => {
+    fg.setAttribute('stroke-dashoffset', circ * (1 - Math.min(1, value / 100)));
+  });
   return svg;
 }
+
+/* 숫자가 0에서 올라간다. 큰 값만 쓸 것. */
+function countUp(node, to, suffix) {
+  const dur = 900, t0 = performance.now();
+  const step = (t) => {
+    const p = Math.min(1, (t - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    node.textContent = num(Math.round(to * eased)) + (suffix || '');
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/* 레벨 구간마다 칭호. 숫자만 있으면 남는 게 없다. */
+const TIERS = [
+  { min: 1,  name: '입문',   emo: '🌱' },
+  { min: 3,  name: '견습',   emo: '🔧' },
+  { min: 6,  name: '숙련',   emo: '⚙️' },
+  { min: 10, name: '정예',   emo: '🎖️' },
+  { min: 15, name: '고수',   emo: '🔥' },
+  { min: 21, name: '장인',   emo: '⭐' },
+  { min: 30, name: '경지',   emo: '👑' }
+];
+const tierOf = (lv) => [...TIERS].reverse().find(t => lv >= t.min) || TIERS[0];
 
 function bar(parent, name, done, tot, valueText) {
   const row = el('div', 'row');
@@ -750,19 +909,25 @@ function viewHome(view, d) {
   const streak = streakOf(d);
 
   /* 레벨 */
-  const hero = el('div', 'card pop');
+  const tier = tierOf(lv.level);
+  const hero = el('div', 'card herocard');
   const row = el('div', 'hero');
   const rw = el('div', 'lvlring');
-  rw.append(ring(pct(lv.into, lv.need), 86, 8));
+  rw.append(ring(pct(lv.into, lv.need), 92, 9));
   const nn = el('div', 'num');
   nn.append(el('b', null, String(lv.level)), el('span', null, 'LEVEL'));
   rw.append(nn);
+
   const body = el('div', 'herobody');
-  body.append(el('div', 'xp', `${num(xp)} XP`));
+  body.append(el('div', 'tier', `${tier.emo} ${tier.name}`));
+  const xpLine = el('div', 'xp');
+  body.append(xpLine);
+  countUp(xpLine, xp, ' XP');
   body.append(el('div', 'next', `다음 레벨까지 ${num(lv.need - lv.into)} XP`));
   const tr = el('div', 'xptrack');
   const tf = el('div', 'xpfill');
-  tf.style.width = pct(lv.into, lv.need) + '%';
+  tf.style.width = '0%';
+  requestAnimationFrame(() => { tf.style.width = pct(lv.into, lv.need) + '%'; });
   tr.append(tf);
   body.append(tr);
   row.append(rw, body);
@@ -819,6 +984,8 @@ function viewHome(view, d) {
     const box = el('i');
     box.style.background = c === 0 ? 'var(--heat-0)' : c === 1 ? 'var(--heat-1)' : c === 2 ? 'var(--heat-2)' : c <= 4 ? 'var(--heat-3)' : 'var(--heat-4)';
     box.title = `${key} · 기록 ${c}건`;
+    if (c >= 3) box.classList.add('lit');
+    if (key === today()) box.classList.add('today');
     if (cellDate > new Date()) box.style.visibility = 'hidden';
     grid.append(box);
   }
@@ -835,8 +1002,11 @@ function viewHome(view, d) {
   /* 업적 */
   const ac = card(`업적 ${ACHIEVEMENTS.filter(a => a.test(d)).length} / ${ACHIEVEMENTS.length}`);
   const bg = el('div', 'badges');
+  let got = 0;
   ACHIEVEMENTS.forEach(a => {
-    const b = el('div', 'badge' + (a.test(d) ? ' got' : ''));
+    const has = a.test(d);
+    const b = el('div', 'badge' + (has ? ' got' : ''));
+    if (has) b.style.setProperty('--b', got++);
     b.append(el('div', 'e', a.emo), el('div', 'n', a.name));
     bg.append(b);
   });
@@ -1990,9 +2160,13 @@ async function render() {
   }
   try {
     const d = await loadAll();
-    document.getElementById('streakchip').textContent = `🔥 ${streakOf(d)}일`;
+    const st = streakOf(d);
+    const chip = document.getElementById('streakchip');
+    chip.textContent = `🔥 ${st}일`;
+    chip.classList.toggle('hot', st >= 3);
     const fresh = document.createElement('div');
     VIEWS[current](fresh, d);
+    [...fresh.children].forEach((n, i) => n.style.setProperty('--i', i));
     view.replaceChildren(...fresh.childNodes);
   } catch (err) {
     const c = card('연결 실패');
