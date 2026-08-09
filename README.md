@@ -13,7 +13,7 @@ obsidian-plugin/  옵시디언 플러그인
 ## 진행 상황
 
 - [x] Supabase 테이블 7개 생성 (RLS 켜짐)
-- [ ] Vercel 배포
+- [x] Vercel 배포 — https://part-time-six.vercel.app
 - [ ] 옵시디언 플러그인 설치
 
 ## 1. Supabase — 완료됨 ✅
@@ -51,9 +51,33 @@ RLS를 켜두고 정책은 두지 않았다. 즉 anon 키로는 아무것도 못
 
 ## 3. 옵시디언 플러그인
 
-1. 볼트의 `.obsidian/plugins/kang-seungwon-dashboard/` 폴더를 만들고 `obsidian-plugin` 내용 복사
-2. 설정 → Community plugins → 활성화
-3. 플러그인 설정에 2번의 Vercel 주소 입력
+컴파일이 필요 없다. `obsidian-plugin/` 안의 3개 파일을 그대로 복사하면 된다.
+
+```
+<볼트>/.obsidian/plugins/kang-seungwon-dashboard/
+    manifest.json
+    main.js
+    styles.css
+```
+
+1. 위 경로로 폴더를 만들고 3개 파일 복사
+   (`.obsidian` 은 숨김 폴더다. 안 보이면 숨김 파일 표시를 켠다.)
+2. 옵시디언 → 설정 → 커뮤니티 플러그인 → **제한 모드 끄기**
+3. 설치된 플러그인 목록에서 **강승원 대시보드** 켜기
+4. 플러그인 설정에서 API 주소 확인 (기본값이 이미 들어있다)
+5. 왼쪽 리본의 대시보드 아이콘 클릭, 또는 명령어 `대시보드 열기`
+
+명령어 `API 연결 확인` 으로 서버 연결만 따로 점검할 수 있다.
+
+> 폰에서 폴더를 만들기 번거로우면, PC 옵시디언에서 한 번 설치한 뒤
+> 동기화하는 편이 빠르다.
+
+## 데이터 넣기
+
+지금은 읽기 화면만 있다. 데이터 입력은 둘 중 하나로 한다.
+
+- Supabase 대시보드 → Table Editor → 해당 `me_*` 테이블에서 직접 입력
+- `POST /api/<엔드포인트>` 로 JSON 전송
 
 ## API
 

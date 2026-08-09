@@ -1,0 +1,145 @@
+.sw-dash {
+  padding: 12px 14px;
+  overflow-y: auto;
+}
+
+.sw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sw-header h2 {
+  margin: 0;
+  font-size: 1.15em;
+}
+
+.sw-refresh {
+  cursor: pointer;
+  font-size: 0.85em;
+  padding: 4px 10px;
+}
+
+.sw-card {
+  background: var(--background-secondary);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.sw-card h3 {
+  margin: 0 0 10px;
+  font-size: 0.95em;
+  color: var(--text-normal);
+}
+
+.sw-row {
+  margin-bottom: 10px;
+}
+
+.sw-row-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.82em;
+  margin-bottom: 4px;
+}
+
+.sw-label {
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-value {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--background-modifier-border);
+  overflow: hidden;
+}
+
+.sw-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--interactive-accent);
+  transition: width 0.3s ease;
+}
+
+.sw-fill.sw-done {
+  background: var(--color-green, #3fb950);
+}
+
+.sw-stat {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-sub {
+  font-size: 0.78em;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.sw-divider {
+  height: 1px;
+  background: var(--background-modifier-border);
+  margin: 10px 0;
+}
+
+.sw-empty {
+  font-size: 0.82em;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.sw-todo {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.84em;
+  padding: 3px 0;
+}
+
+.sw-todo .sw-date {
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 0.9em;
+  flex-shrink: 0;
+}
+
+.sw-pri {
+  font-size: 0.6em;
+  flex-shrink: 0;
+}
+
+.sw-pri-high { color: var(--color-red, #f85149); }
+.sw-pri-medium { color: var(--color-yellow, #d29922); }
+.sw-pri-low { color: var(--text-faint); }
+
+.sw-status {
+  font-size: 0.85em;
+  color: var(--text-muted);
+  padding: 6px 0;
+}
+
+.sw-status.sw-error {
+  color: var(--text-error);
+}
+
+.sw-footer {
+  font-size: 0.75em;
+  color: var(--text-faint);
+  text-align: right;
+  margin-top: 6px;
+}
