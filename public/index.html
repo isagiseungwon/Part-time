@@ -15,6 +15,7 @@
     --card:      #16161d;
     --raised:    #1e1e28;
     --line:      #272733;
+    --track:     #313142;  /* 진행 트랙. 카드 위에서 확실히 보여야 링이 링으로 읽힌다 */
     --text:      #f4f4f8;
     --muted:     #9c9cab;
     --faint:     #6b6b7a;
@@ -68,7 +69,12 @@
     font-variant-numeric: tabular-nums;
   }
 
-  nav { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px; }
+  nav {
+    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px;
+    /* 오른쪽 페이드로 더 스크롤된다는 걸 알린다 */
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+            mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
   nav::-webkit-scrollbar { display: none; }
   nav button {
     flex: 0 0 auto; cursor: pointer; font-family: inherit;
@@ -109,7 +115,7 @@
   .herobody { flex: 1; min-width: 0; }
   .herobody .xp { font-size: .95rem; font-weight: 650; font-variant-numeric: tabular-nums; }
   .herobody .next { font-size: .76rem; color: var(--muted); margin-top: 2px; }
-  .xptrack { height: 8px; background: var(--raised); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+  .xptrack { height: 8px; background: var(--track); border-radius: 4px; overflow: hidden; margin-top: 10px; }
   .xpfill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .5s cubic-bezier(.2,.7,.3,1); }
 
   /* ---------- 퀘스트 ---------- */
@@ -156,9 +162,12 @@
 
   /* ---------- 히트맵 ---------- */
 
-  .heat { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 1fr); gap: 3px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
-  .heat::-webkit-scrollbar { display: none; }
-  .heat i { width: 11px; height: 11px; border-radius: 3px; background: var(--heat-0); display: block; }
+  .heat {
+    display: grid; grid-auto-flow: column;
+    grid-template-rows: repeat(7, 1fr); grid-auto-columns: 1fr;
+    gap: 3px;
+  }
+  .heat i { width: auto; aspect-ratio: 1; border-radius: 3px; background: var(--heat-0); display: block; }
   .heatlegend { display: flex; align-items: center; gap: 5px; justify-content: flex-end; margin-top: 10px; font-size: .68rem; color: var(--faint); }
   .heatlegend i { width: 9px; height: 9px; border-radius: 2px; display: block; }
 
@@ -191,7 +200,7 @@
   .rowtop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: .85rem; margin-bottom: 6px; }
   .rowtop .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rowtop .v { color: var(--muted); flex: 0 0 auto; font-size: .78rem; font-variant-numeric: tabular-nums; }
-  .track { height: 7px; border-radius: 4px; background: var(--raised); overflow: hidden; }
+  .track { height: 7px; border-radius: 4px; background: var(--track); overflow: hidden; }
   .fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width .4s ease; }
   .fill.full { background: var(--done); }
 
@@ -432,7 +441,7 @@ function ring(value, size, width, color) {
   const bg = document.createElementNS(ns, 'circle');
   bg.setAttribute('cx', size / 2); bg.setAttribute('cy', size / 2); bg.setAttribute('r', r);
   bg.setAttribute('fill', 'none');
-  bg.setAttribute('stroke', 'var(--raised)');
+  bg.setAttribute('stroke', 'var(--track)');
   bg.setAttribute('stroke-width', width);
 
   const fg = document.createElementNS(ns, 'circle');
