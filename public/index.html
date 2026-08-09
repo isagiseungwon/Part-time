@@ -271,14 +271,15 @@
   .entry .eh { display: flex; align-items: flex-start; gap: 9px; }
   .entry .eh .et { flex: 1; min-width: 0; font-size: .9rem; font-weight: 600; line-height: 1.35; }
   .entry .src { font-size: .72rem; color: var(--faint); margin-top: 3px; }
-  .entry .field { margin-top: 10px; }
-  .entry .field .k {
+  /* .entry 밖(복습 화면 등)에서도 쓰이므로 스코프를 두지 않는다 */
+  .field { margin-top: 10px; }
+  .field .k {
     font-size: .68rem; color: var(--faint); letter-spacing: .05em;
     text-transform: uppercase; margin-bottom: 3px;
   }
-  .entry .field .v { font-size: .84rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
-  .entry .field.act { border-left: 2px solid var(--accent); padding-left: 9px; }
-  .entry .field.sol { border-left: 2px solid var(--done); padding-left: 9px; }
+  .field .v { font-size: .84rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .field.act { border-left: 2px solid var(--accent); padding-left: 9px; }
+  .field.sol { border-left: 2px solid var(--done); padding-left: 9px; }
   .entry .acts { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
 
   .pill {
@@ -337,7 +338,9 @@
 /* ============ 설정 ============ */
 
 const TABS = [
-  { id: 'home',     label: '홈' },
+  { id: 'home',      label: '홈' },
+  { id: 'mastery',   label: '🧠 숙달' },
+  { id: 'selfcheck', label: '🪞 메타인지' },
   { id: 'notes',    label: '📝 노트' },
   { id: 'blockers', label: '🧩 막힌 것' },
   { id: 'people',   label: '🤝 사람' },
@@ -352,8 +355,28 @@ const TABS = [
 /* 행동 하나당 경험치. 어려운 일일수록 크게. */
 const XP = {
   lecture: 10, workout: 20, page: 0.5, post: 30, task: 25, book: 60,
-  note: 15, applied: 25, solved: 40, person: 15, idea: 5, shipped: 50
+  note: 15, applied: 25, solved: 40, person: 15, idea: 5, shipped: 50,
+  card: 5, review: 3, unaided: 20, check: 20
 };
+
+/* 숙달 3단계. 안다 → 쓴다 → 왜인지 안다. */
+const LEVELS = [
+  { n: 0, name: '모름',       emo: '⬜', days: 1 },
+  { n: 1, name: '할 수 있다',  emo: '🟦', days: 3 },
+  { n: 2, name: '구사한다',    emo: '🟩', days: 7 },
+  { n: 3, name: '궁구한다',    emo: '⭐', days: 21 }
+];
+
+const MASTERY_CATS = [
+  ['ammo',      '탄종'],
+  ['tool',      '공구 · 렌치'],
+  ['procedure', '절차 · 조치'],
+  ['theory',    '이론 · 사상'],
+  ['knowledge', '기타 지식']
+];
+const MCAT_LABEL = Object.fromEntries(MASTERY_CATS);
+
+const AREAS = ['포반 지식', '체력', '태도', '관계', '기타'];
 
 const ACHIEVEMENTS = [
   { id: 'first',    emo: '🌱', name: '첫 기록',      test: d => total(d) > 0 },
@@ -371,7 +394,12 @@ const ACHIEVEMENTS = [
   { id: 'post10',   emo: '📱', name: '게시물 10개',  test: d => d.mindpick.length >= 10 },
   { id: 'course1',  emo: '🎓', name: '강의 완주',    test: d => d.courses.some(c => +c.total_lectures > 0 && +c.completed_lectures >= +c.total_lectures) },
   { id: 'lvl5',     emo: '👑', name: '레벨 5',       test: d => levelOf(total(d)).level >= 5 },
-  { id: 'lvl10',    emo: '🏆', name: '레벨 10',      test: d => levelOf(total(d)).level >= 10 }
+  { id: 'lvl10',    emo: '🏆', name: '레벨 10',      test: d => levelOf(total(d)).level >= 10 },
+  { id: 'card20',   emo: '🧠', name: '항목 20개',    test: d => d.mastery.length >= 20 },
+  { id: 'master1',  emo: '⭐', name: '첫 궁구',      test: d => d.mastery.some(m => m.level >= 3) },
+  { id: 'master10', emo: '🎯', name: '구사 10개',    test: d => d.mastery.filter(m => m.level >= 2).length >= 10 },
+  { id: 'unaided',  emo: '🌀', name: '무의식 10회',  test: d => d.mastery.reduce((s, m) => s + (m.unaided_count || 0), 0) >= 10 },
+  { id: 'mirror',   emo: '🪞', name: '메타인지 10회', test: d => d.selfcheck.length >= 10 }
 ];
 
 const BLOCKER_CATS = [
@@ -425,6 +453,8 @@ function total(d) {
   for (const b of d.blockers)  if (b.status === 'solved') xp += XP.solved;
   for (const p of d.people)    xp += XP.person;
   for (const i of d.ideas)     xp += XP.idea + (i.status === 'shipped' ? XP.shipped : 0);
+  for (const m of d.mastery)   xp += XP.card + (m.reps || 0) * XP.review + (m.unaided_count || 0) * XP.unaided;
+  for (const s of d.selfcheck) xp += XP.check;
   return Math.round(xp);
 }
 
@@ -453,6 +483,9 @@ function activityMap(d) {
   d.blockers.forEach(r => { add(r.created_at); add(r.solved_at); });
   d.people.forEach(r => { add(r.met_at); add(r.last_contact); });
   d.ideas.forEach(r => add(r.created_at));
+  d.mastery.forEach(r => add(r.last_review));
+  d.drills.forEach(r => add(r.date));
+  d.selfcheck.forEach(r => add(r.date));
   return m;
 }
 
@@ -469,7 +502,8 @@ function streakOf(d) {
 
 /* ============ API ============ */
 
-const ENDPOINTS = ['courses', 'fitness', 'books', 'mindpick', 'military', 'notes', 'blockers', 'people', 'ideas'];
+const ENDPOINTS = ['courses', 'fitness', 'books', 'mindpick', 'military', 'notes', 'blockers',
+                   'people', 'ideas', 'mastery', 'drills', 'selfcheck'];
 let DATA = null;
 let current = 'home';
 
@@ -752,6 +786,9 @@ function viewHome(view, d) {
   });
   view.append(qc);
 
+  /* 오늘 들고 나갈 한 가지 — 폰 없는 일과 중을 위한 장치 */
+  view.append(carryCard(d));
+
   /* 영역별 진행 */
   const sc = card('영역별 진행');
   const g = el('div', 'rings');
@@ -807,6 +844,73 @@ function viewHome(view, d) {
   view.append(ac);
 }
 
+/* 오늘 들고 나갈 한 가지.
+   폰을 못 보는 시간에 쓰는 장치라, 앱은 나가기 전과 돌아온 뒤에만 쓴다.
+   아침에 하나 고르고 → 일과 중엔 머리로만 굴리고 → 저녁에 회수한다. */
+function carryCard(d) {
+  const c = card('오늘 들고 나갈 한 가지');
+  const drill = d.drills.find(x => x.date === today());
+
+  if (!drill) {
+    if (!d.mastery.length) {
+      c.append(el('div', 'empty', '숙달 탭에 항목을 하나 넣으면 여기서 매일 하나씩 뽑아준다.'));
+      return c;
+    }
+    /* 낮은 단계 · 복습일이 지난 것부터 */
+    const pool = [...d.mastery].sort((a, b) => {
+      const ad = (a.next_review || '9999') <= today() ? 0 : 1;
+      const bd = (b.next_review || '9999') <= today() ? 0 : 1;
+      return ad - bd || (a.level || 0) - (b.level || 0);
+    });
+    const pick = pool[0];
+    c.append(el('div', 'empty', '일과 나가기 전에 하나만 골라. 오늘은 이것만 머리에 넣고 나간다.'));
+    const e = el('div', 'entry');
+    e.append(el('div', 'et', pick.term));
+    if (pick.cue) e.append(el('div', 'src', '실마리 · ' + pick.cue));
+    const b = el('button', 'submit', '이걸로 들고 나가기');
+    b.onclick = () => save('drills', { date: today(), mastery_id: pick.id, term_snapshot: pick.term }, '오늘 이거 하나');
+    e.append(b);
+    c.append(e);
+    return c;
+  }
+
+  const e = el('div', 'entry');
+  const h = el('div', 'eh');
+  h.append(el('div', 'et', drill.term_snapshot || '오늘의 항목'));
+  if (drill.recalled != null) {
+    h.append(el('span', 'pill ' + (drill.unaided ? 'solved' : drill.recalled ? 'trying' : 'open'),
+      drill.unaided ? '무의식' : drill.recalled ? '떠올림' : '못 떠올림'));
+  }
+  e.append(h);
+
+  if (drill.recalled == null) {
+    e.append(el('div', 'src', '일과 끝나고 돌아와서 눌러.'));
+    const acts = el('div', 'acts');
+    const no = el('button', 'mini danger', '못 떠올렸다');
+    no.onclick = () => patch('drills', drill.id, { recalled: false, unaided: false }, '기록했어');
+    const yes = el('button', 'mini go', '떠올렸다');
+    yes.onclick = () => patch('drills', drill.id, { recalled: true, unaided: false }, '기록했어');
+    const un = el('button', 'mini ok', `안 보고 나왔다 (+${XP.unaided}XP)`);
+    un.onclick = async () => {
+      const cardRow = d.mastery.find(m => m.id === drill.mastery_id);
+      if (cardRow) await gradeCard(cardRow, true, true);
+      await patch('drills', drill.id, { recalled: true, unaided: true }, `+${XP.unaided} XP`);
+    };
+    acts.append(no, yes, un);
+    e.append(acts);
+  } else {
+    e.append(el('div', 'src', drill.unaided
+      ? '몸에 붙었다. 이 항목은 간격이 늘어난다.'
+      : drill.recalled ? '떠올랐지만 아직 의식적으로. 반복하면 붙는다.' : '내일 다시 이 항목이 올라온다.'));
+  }
+  c.append(e);
+
+  const streak7 = d.drills.filter(x => x.date >= daysAgo(6));
+  const un7 = streak7.filter(x => x.unaided).length;
+  c.append(el('div', 'empty', `최근 7일 · 들고 나간 날 ${streak7.length}일 · 무의식으로 나온 날 ${un7}일`));
+  return c;
+}
+
 /* 오늘 할 만한 것을 데이터에서 뽑아낸다. */
 function quests(d) {
   const t = today();
@@ -853,6 +957,26 @@ function quests(d) {
     sub: posted ? '오늘 올림' : '릴스든 카드뉴스든 하나',
     done: posted,
     act: () => goTab('mindpick')
+  });
+
+  const due = dueCards(d);
+  if (due.length) {
+    out.push({
+      emo: '🧠', xp: XP.review * due.length,
+      title: `숙달 복습 ${due.length}장`,
+      sub: due.slice(0, 3).map(m => m.term).join(', '),
+      done: false,
+      act: () => goTab('mastery')
+    });
+  }
+
+  const checked = d.selfcheck.some(s => s.date === t);
+  out.push({
+    emo: '🪞', xp: XP.check,
+    title: '오늘 하루 메타인지 1개',
+    sub: checked ? '오늘 점검함' : '선임 눈에 나는 몇 점이었나 · 근거와 함께',
+    done: checked,
+    act: () => goTab('selfcheck')
   });
 
   /* 적용 안 한 노트가 있으면 새 노트보다 그걸 먼저 민다. */
@@ -929,7 +1053,10 @@ function stats(d) {
   const solved  = d.blockers.filter(b => b.status === 'solved').length;
   const sv      = service(d);
 
+  const mast = d.mastery.filter(m => (m.level || 0) >= 2).length;
+
   return [
+    { emo: '🧠', label: '숙달',      pct: d.mastery.length ? pct(mast, d.mastery.length) : null, detail: d.mastery.length ? `구사 ${mast}/${d.mastery.length}` : '없음' },
     { emo: '📝', label: '노트 적용', pct: d.notes.length ? pct(applied, d.notes.length) : null, detail: d.notes.length ? `${applied}/${d.notes.length}` : '없음' },
     { emo: '🧩', label: '돌파',      pct: d.blockers.length ? pct(solved, d.blockers.length) : null, detail: d.blockers.length ? `${solved}/${d.blockers.length}` : '없음' },
     { emo: '🔥', label: '연속',      pct: pct(streakOf(d), 30),                 detail: `${streakOf(d)}일` },
@@ -1244,6 +1371,262 @@ function viewMilitary(view, d) {
     });
     view.append(h);
   }
+}
+
+/* ---------- 🧠 숙달 ---------- */
+
+const MASTERY_FIELDS = [
+  { key: 'term', required: true, label: '항목', placeholder: '예) 고폭탄 / 몽키렌치 / 불발 시 조치' },
+  { key: 'category', label: '분류', type: 'select', options: MASTERY_CATS },
+  { key: 'meaning', label: '내용 · 기능', type: 'textarea' },
+  { key: 'cue', label: '떠올리는 실마리', placeholder: '연상, 두문자, 손에 익은 순서' },
+  { key: 'why', label: '왜 이게 중요한가 (궁구)', type: 'textarea' }
+];
+
+const dueCards = (d) => d.mastery.filter(m => !m.next_review || m.next_review <= today());
+
+/* 복습 결과 반영. 맞으면 한 단계 올리고 간격을 늘린다. */
+function gradeCard(card, ok, unaided) {
+  const lv = ok ? Math.min(3, (card.level || 0) + 1) : Math.max(0, (card.level || 0) - 1);
+  const next = new Date();
+  next.setDate(next.getDate() + (ok ? LEVELS[lv].days : 1));
+  return patch('mastery', card.id, {
+    level: lv,
+    reps: (card.reps || 0) + 1,
+    lapses: (card.lapses || 0) + (ok ? 0 : 1),
+    unaided_count: (card.unaided_count || 0) + (unaided ? 1 : 0),
+    last_review: today(),
+    next_review: iso(next)
+  });
+}
+
+let reviewQueue = null;   // 복습 중인 카드 배열
+let reviewShown = false;  // 답을 열었는가
+
+function viewMastery(view, d) {
+  const rows = d.mastery;
+  const due = dueCards(d);
+
+  /* 복습 모드 */
+  if (reviewQueue && reviewQueue.length) {
+    const card = rows.find(m => m.id === reviewQueue[0]) || null;
+    if (!card) { reviewQueue.shift(); return viewMastery(view, d); }
+
+    const c = el('div', 'card pop');
+    const top = el('div', 'rowtop');
+    top.append(el('span', 'n', `${MCAT_LABEL[card.category] || card.category} · ${LEVELS[card.level || 0].emo} ${LEVELS[card.level || 0].name}`),
+               el('span', 'v', `남은 ${reviewQueue.length}장`));
+    c.append(top);
+
+    const q = el('div');
+    q.style.cssText = 'font-size:1.35rem;font-weight:700;line-height:1.35;margin:18px 0 4px;letter-spacing:-.02em';
+    q.textContent = card.term;
+    c.append(q);
+
+    if (!reviewShown) {
+      if (card.cue) {
+        const cue = el('div', null, '실마리 · ' + card.cue);
+        cue.style.cssText = 'font-size:.8rem;color:var(--faint);margin-bottom:18px';
+        c.append(cue);
+      }
+      const show = el('button', 'submit', '답 보기');
+      show.onclick = () => { reviewShown = true; render(); };
+      c.append(show);
+    } else {
+      const fld = (k, v, cls) => {
+        if (!v) return;
+        const f = el('div', 'field' + (cls ? ' ' + cls : ''));
+        f.append(el('div', 'k', k), el('div', 'v', v));
+        c.append(f);
+      };
+      fld('내용', card.meaning);
+      fld('실마리', card.cue);
+      fld('왜 중요한가', card.why, 'act');
+
+      const hint = el('div', null, '안 보고 떠올랐으면 "무의식" 을 눌러. 그게 진짜 숙달이야.');
+      hint.style.cssText = 'font-size:.76rem;color:var(--faint);margin:16px 0 8px';
+      c.append(hint);
+
+      const acts = el('div', 'acts');
+      const no = el('button', 'mini danger', '못 떠올림');
+      no.onclick = async () => { await gradeCard(card, false, false); reviewQueue.shift(); reviewShown = false; render(); };
+      const yes = el('button', 'mini go', '떠올랐다');
+      yes.onclick = async () => { await gradeCard(card, true, false); reviewQueue.shift(); reviewShown = false; render(); };
+      const un = el('button', 'mini ok', `무의식 (+${XP.unaided}XP)`);
+      un.onclick = async () => { await gradeCard(card, true, true); reviewQueue.shift(); reviewShown = false; render(); };
+      acts.append(no, yes, un);
+      c.append(acts);
+    }
+
+    const quit = el('button', 'mini', '복습 그만');
+    quit.style.marginTop = '14px';
+    quit.onclick = () => { reviewQueue = null; reviewShown = false; render(); };
+    c.append(quit);
+
+    view.append(c);
+    return;
+  }
+  if (reviewQueue) { reviewQueue = null; toast('복습 끝!', 'good'); }
+
+  /* 요약 */
+  const head = card('숙달');
+  const g = el('div', 'rings');
+  const byLevel = n => rows.filter(m => (m.level || 0) === n).length;
+  [1, 2, 3].forEach(n => {
+    const cell = el('div', 'ringcell');
+    const w = el('div', 'ringwrap');
+    w.append(ring(rows.length ? pct(rows.filter(m => (m.level || 0) >= n).length, rows.length) : 0, 56, 6));
+    w.append(el('div', 'pctxt', String(rows.filter(m => (m.level || 0) >= n).length)));
+    cell.append(w, el('div', 'lab', `${LEVELS[n].emo} ${LEVELS[n].name}`), el('div', 'val', `이상 ${rows.filter(m => (m.level || 0) >= n).length}개`));
+    g.append(cell);
+  });
+  head.append(g);
+  const sum = el('div', 'empty', `전체 ${rows.length}개 · 오늘 복습할 것 ${due.length}개 · 아직 모르는 것 ${byLevel(0)}개`);
+  head.append(sum);
+  if (due.length) {
+    const start = el('button', 'submit', `복습 시작 (${due.length}장)`);
+    start.onclick = () => { reviewQueue = due.map(m => m.id); reviewShown = false; render(); };
+    head.append(start);
+  }
+  view.append(head);
+
+  const f = card();
+  f.append(collapsed('＋ 항목 추가', form(MASTERY_FIELDS, b => {
+    b.category = b.category || 'knowledge';
+    return save('mastery', b, `+${XP.card} XP`);
+  }), !rows.length));
+  view.append(f);
+
+  if (!rows.length) {
+    const e = card();
+    e.append(el('div', 'empty',
+      '선임이 알려준 것을 그날 바로 넣어. 탄종 하나, 렌치 하나씩이면 된다. ' +
+      '내용은 네가 직접 써야 머리에 남는다 — 받아적은 걸 그대로 옮기지 말고 네 말로 바꿔서.'));
+    view.append(e);
+    return;
+  }
+
+  MASTERY_CATS.forEach(([cat, label]) => {
+    const group = rows.filter(m => m.category === cat);
+    if (!group.length) return;
+    const c = card(`${label} ${group.length}`);
+    group.sort((a, b) => (a.level || 0) - (b.level || 0)).forEach(m => {
+      const e = el('div', 'entry');
+      const h = el('div', 'eh');
+      h.append(el('div', 'et', m.term));
+      h.append(el('span', 'pill' + ((m.level || 0) >= 3 ? ' solved' : (m.level || 0) >= 2 ? ' trying' : ''),
+        `${LEVELS[m.level || 0].emo} ${LEVELS[m.level || 0].name}`));
+      e.append(h);
+      const meta = [
+        m.next_review ? (m.next_review <= today() ? '오늘 복습' : `다음 ${m.next_review}`) : '복습 예정 없음',
+        `${m.reps || 0}회`,
+        (m.unaided_count || 0) ? `무의식 ${m.unaided_count}회` : null
+      ].filter(Boolean).join(' · ');
+      e.append(el('div', 'src', meta));
+      if (m.meaning) {
+        const x = el('div', 'field');
+        x.append(el('div', 'k', '내용'), el('div', 'v', m.meaning));
+        e.append(x);
+      }
+      if (m.why) {
+        const x = el('div', 'field act');
+        x.append(el('div', 'k', '왜 중요한가'), el('div', 'v', m.why));
+        e.append(x);
+      }
+      const acts = el('div', 'acts');
+      const del = el('button', 'mini danger', '삭제');
+      del.onclick = () => remove('mastery', m.id, m.term);
+      acts.append(editBtn('항목 수정', MASTERY_FIELDS, m, 'mastery'), del);
+      e.append(acts);
+      c.append(e);
+    });
+    view.append(c);
+  });
+}
+
+/* ---------- 🪞 메타인지 ---------- */
+
+const CHECK_FIELDS = [
+  { key: 'area', label: '영역', type: 'select', options: AREAS.map(a => [a, a]) },
+  { key: 'self_score', label: '내가 보는 나 (1~5)', type: 'number', half: true },
+  { key: 'other_score', label: '선임이 볼 나 (1~5)', type: 'number', half: true },
+  { key: 'evidence', required: true, label: '근거 — 실제로 있었던 일만', type: 'textarea' },
+  { key: 'gap_note', label: '차이가 난다면 왜', type: 'textarea' },
+  { key: 'action', label: '다음에 바꿀 것 하나' },
+  { key: 'date', label: '날짜', type: 'date' }
+];
+
+function viewSelfcheck(view, d) {
+  const rows = d.selfcheck;
+
+  const head = card('메타인지');
+  head.append(el('div', 'empty',
+    '내 눈의 나와 선임 눈의 나는 다르다. 바꿀 수 있는 건 남이 아니라 그 차이다. ' +
+    '점수보다 근거 칸이 중요하다 — 느낌 말고 실제로 있었던 일만 적는다.'));
+  view.append(head);
+
+  const f = card();
+  f.append(collapsed('＋ 점검 기록', form(CHECK_FIELDS.map(x => x.key === 'date' ? { ...x, value: today() } : x), b => {
+    b.area = b.area || AREAS[0];
+    b.date = b.date || today();
+    return save('selfcheck', b, `+${XP.check} XP`);
+  }), !rows.length));
+  view.append(f);
+
+  if (!rows.length) return;
+
+  /* 영역별 평균 간극 */
+  const gapCard = card('영역별 간극');
+  AREAS.forEach(area => {
+    const g = rows.filter(r => r.area === area && r.self_score != null && r.other_score != null);
+    if (!g.length) return;
+    const self = g.reduce((s, r) => s + r.self_score, 0) / g.length;
+    const other = g.reduce((s, r) => s + r.other_score, 0) / g.length;
+    const diff = (self - other).toFixed(1);
+    const row = el('div', 'row');
+    const top = el('div', 'rowtop');
+    top.append(el('span', 'n', area),
+               el('span', 'v', `나 ${self.toFixed(1)} · 선임 ${other.toFixed(1)} · 차 ${diff > 0 ? '+' : ''}${diff}`));
+    const track = el('div', 'track');
+    const fl = el('div', 'fill');
+    fl.style.width = pct(other, 5) + '%';
+    if (Math.abs(diff) <= 0.5) fl.classList.add('full');
+    track.append(fl);
+    row.append(top, track);
+    gapCard.append(row);
+  });
+  gapCard.append(el('div', 'empty', '막대는 선임이 볼 점수. 차이가 0.5 이내면 초록.'));
+  view.append(gapCard);
+
+  const listCard = card('기록');
+  rows.forEach(r => {
+    const e = el('div', 'entry');
+    const h = el('div', 'eh');
+    h.append(el('div', 'et', r.area));
+    if (r.self_score != null && r.other_score != null) {
+      const diff = r.self_score - r.other_score;
+      h.append(el('span', 'pill' + (Math.abs(diff) <= 1 ? ' solved' : ' open'),
+        `나 ${r.self_score} / 선임 ${r.other_score}`));
+    }
+    e.append(h);
+    e.append(el('div', 'src', r.date));
+    const fld = (k, v, cls) => {
+      if (!v) return;
+      const x = el('div', 'field' + (cls ? ' ' + cls : ''));
+      x.append(el('div', 'k', k), el('div', 'v', v));
+      e.append(x);
+    };
+    fld('근거', r.evidence);
+    fld('왜 차이 나나', r.gap_note);
+    fld('바꿀 것', r.action, 'act');
+    const acts = el('div', 'acts');
+    const del = el('button', 'mini danger', '삭제');
+    del.onclick = () => remove('selfcheck', r.id, r.area + ' ' + r.date);
+    acts.append(editBtn('점검 수정', CHECK_FIELDS, r, 'selfcheck'), del);
+    e.append(acts);
+    listCard.append(e);
+  });
+  view.append(listCard);
 }
 
 /* ---------- 📝 노트 ---------- */
@@ -1591,7 +1974,8 @@ function viewIdeas(view, d) {
 }
 
 const VIEWS = {
-  home: viewHome, notes: viewNotes, blockers: viewBlockers, people: viewPeople, ideas: viewIdeas,
+  home: viewHome, mastery: viewMastery, selfcheck: viewSelfcheck,
+  notes: viewNotes, blockers: viewBlockers, people: viewPeople, ideas: viewIdeas,
   courses: viewCourses, fitness: viewFitness, books: viewBooks, mindpick: viewMindpick, military: viewMilitary
 };
 
