@@ -1,0 +1,767 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#111318">
+<title>강승원 관리자</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --card-2: #1e222b;
+    --line: #2a2f3a;
+    --text: #e7e9ee;
+    --muted: #949cad;
+    --faint: #6b7383;
+    --accent: #5b8cff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --radius: 14px;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo",
+                 "Noto Sans KR", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    padding-bottom: 90px;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(15,17,21,.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    padding: 14px 16px 0;
+  }
+
+  h1 { margin: 0 0 12px; font-size: 1.15rem; letter-spacing: -.01em; }
+
+  nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 10px;
+  }
+  nav::-webkit-scrollbar { display: none; }
+
+  nav button {
+    flex: 0 0 auto;
+    background: var(--card);
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: .85rem;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  nav button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  main { padding: 16px; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .card h2 { margin: 0 0 12px; font-size: .95rem; }
+  .card h3 { margin: 0 0 8px; font-size: .85rem; color: var(--muted); font-weight: 600; }
+
+  .row { margin-bottom: 14px; }
+  .row:last-child { margin-bottom: 0; }
+
+  .row-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    font-size: .85rem;
+    margin-bottom: 5px;
+  }
+  .row-top .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-top .val { color: var(--muted); flex: 0 0 auto; font-variant-numeric: tabular-nums; font-size: .8rem; }
+
+  .track { height: 7px; border-radius: 4px; background: var(--card-2); overflow: hidden; }
+  .fill { height: 100%; background: var(--accent); border-radius: 4px; transition: width .35s ease; }
+  .fill.done { background: var(--green); }
+
+  .big { font-size: 1.6rem; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+  .sub { font-size: .8rem; color: var(--faint); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .tile {
+    background: var(--card-2);
+    border-radius: 11px;
+    padding: 12px;
+  }
+  .tile .k { font-size: .75rem; color: var(--faint); margin-bottom: 3px; }
+  .tile .v { font-size: 1.15rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  .item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: .88rem;
+  }
+  .item:last-child { border-bottom: none; }
+  .item .grow { flex: 1; min-width: 0; }
+  .item .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .m { font-size: .75rem; color: var(--faint); }
+
+  .dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+  .dot.high { background: var(--red); }
+  .dot.medium { background: var(--yellow); }
+  .dot.low { background: var(--faint); }
+
+  button.mini {
+    background: var(--card-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 6px 11px;
+    font-size: .78rem;
+    font-family: inherit;
+    cursor: pointer;
+    flex: 0 0 auto;
+  }
+  button.mini:active { background: var(--line); }
+  button.mini.danger { color: var(--red); }
+  button.mini.go { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  label { display: block; font-size: .78rem; color: var(--muted); margin: 10px 0 5px; }
+
+  input, select, textarea {
+    width: 100%;
+    background: var(--card-2);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 11px;
+    font-size: 16px; /* 16px 미만이면 모바일에서 화면이 확대된다 */
+    font-family: inherit;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea { min-height: 68px; resize: vertical; }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  button.submit {
+    width: 100%;
+    margin-top: 14px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 13px;
+    font-size: .95rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  button.submit:disabled { opacity: .5; }
+
+  .empty { color: var(--faint); font-size: .84rem; padding: 6px 0; }
+  .err { color: var(--red); font-size: .84rem; }
+
+  details summary {
+    cursor: pointer;
+    font-size: .85rem;
+    color: var(--accent);
+    padding: 4px 0;
+    list-style: none;
+  }
+  details summary::-webkit-details-marker { display: none; }
+  details[open] summary { margin-bottom: 4px; }
+
+  #toast {
+    position: fixed;
+    left: 50%;
+    bottom: 26px;
+    transform: translate(-50%, 90px);
+    background: var(--card-2);
+    border: 1px solid var(--line);
+    color: var(--text);
+    padding: 11px 18px;
+    border-radius: 999px;
+    font-size: .85rem;
+    transition: transform .25s ease;
+    z-index: 50;
+    max-width: 88vw;
+    text-align: center;
+  }
+  #toast.show { transform: translate(-50%, 0); }
+  #toast.bad { border-color: var(--red); color: var(--red); }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f7f9; --card: #fff; --card-2: #f0f2f5; --line: #e2e5ea;
+      --text: #16181d; --muted: #5c6472; --faint: #8a92a1;
+    }
+    header { background: rgba(246,247,249,.92); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>강승원 관리자</h1>
+  <nav id="tabs"></nav>
+</header>
+
+<main id="view"></main>
+<div id="toast"></div>
+
+<script>
+const TABS = [
+  { id: 'home',     label: '요약' },
+  { id: 'courses',  label: '📚 강의' },
+  { id: 'fitness',  label: '💪 피트니스' },
+  { id: 'books',    label: '📖 독서' },
+  { id: 'mindpick', label: '📱 마인드픽' },
+  { id: 'military', label: '🪖 군대' }
+];
+
+const cache = {};
+let current = 'home';
+
+/* ---------- 유틸 ---------- */
+
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+
+const pct = (a, b) => (b ? Math.min(100, Math.round((a / b) * 100)) : 0);
+const today = () => new Date().toISOString().slice(0, 10);
+const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
+const num = (v) => (v == null ? 0 : Number(v)).toLocaleString('ko-KR');
+
+function toast(msg, bad) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.toggle('bad', !!bad);
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+async function api(path, options) {
+  const res = await fetch('/api/' + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options
+  });
+  if (res.status === 204) return null;
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+
+async function load(name, force) {
+  if (!force && cache[name]) return cache[name];
+  cache[name] = await api(name);
+  return cache[name];
+}
+
+async function save(name, body) {
+  await api(name, { method: 'POST', body: JSON.stringify(body) });
+  delete cache[name];
+  toast('저장했어');
+  render();
+}
+
+async function patch(name, id, body) {
+  await api(`${name}?id=${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+  delete cache[name];
+  render();
+}
+
+async function remove(name, id, label) {
+  if (!confirm(`"${label}" 삭제할까?`)) return;
+  await api(`${name}?id=${id}`, { method: 'DELETE' });
+  delete cache[name];
+  toast('삭제했어');
+  render();
+}
+
+/* 진행률 막대 한 줄 */
+function bar(parent, name, done, total, valueText) {
+  const row = el('div', 'row');
+  const top = el('div', 'row-top');
+  top.append(el('span', 'name', name), el('span', 'val', valueText ?? `${done} / ${total}`));
+  const track = el('div', 'track');
+  const fill = el('div', 'fill');
+  const p = pct(done, total);
+  fill.style.width = p + '%';
+  if (p >= 100) fill.classList.add('done');
+  track.append(fill);
+  row.append(top, track);
+  parent.append(row);
+}
+
+function card(title) {
+  const c = el('div', 'card');
+  if (title) c.append(el('h2', null, title));
+  return c;
+}
+
+/* 입력 폼 생성기 */
+function form(fields, onSubmit, submitLabel) {
+  const wrap = el('div');
+  const inputs = {};
+
+  const add = (f) => {
+    const holder = el('div');
+    holder.append(el('label', null, f.label));
+    let input;
+    if (f.type === 'select') {
+      input = el('select');
+      f.options.forEach(([v, t]) => {
+        const o = el('option', null, t);
+        o.value = v;
+        input.append(o);
+      });
+    } else if (f.type === 'textarea') {
+      input = el('textarea');
+    } else {
+      input = el('input');
+      input.type = f.type || 'text';
+      if (f.step) input.step = f.step;
+    }
+    if (f.value !== undefined) input.value = f.value;
+    if (f.placeholder) input.placeholder = f.placeholder;
+    inputs[f.key] = input;
+    holder.append(input);
+    return holder;
+  };
+
+  for (let i = 0; i < fields.length; i++) {
+    const f = fields[i];
+    const next = fields[i + 1];
+    if (f.half && next && next.half) {
+      const pair = el('div', 'two');
+      pair.append(add(f), add(next));
+      wrap.append(pair);
+      i++;
+    } else {
+      wrap.append(add(f));
+    }
+  }
+
+  const btn = el('button', 'submit', submitLabel || '추가');
+  btn.onclick = async () => {
+    const body = {};
+    for (const [k, input] of Object.entries(inputs)) {
+      const v = input.value.trim();
+      if (v !== '') body[k] = v;
+    }
+    btn.disabled = true;
+    btn.textContent = '저장 중…';
+    try {
+      await onSubmit(body);
+    } catch (err) {
+      toast(err.message, true);
+      btn.disabled = false;
+      btn.textContent = submitLabel || '추가';
+    }
+  };
+  wrap.append(btn);
+  return wrap;
+}
+
+function collapsed(title, node) {
+  const d = el('details');
+  d.append(el('summary', null, title));
+  d.append(node);
+  return d;
+}
+
+/* ---------- 화면 ---------- */
+
+async function viewHome(view) {
+  const [courses, fitness, books, mindpick, military] = await Promise.all(
+    ['courses', 'fitness', 'books', 'mindpick', 'military'].map((n) => load(n))
+  );
+
+  const c = card('오늘 상태');
+  const grid = el('div', 'grid');
+
+  const doneL = courses.reduce((s, r) => s + (+r.completed_lectures || 0), 0);
+  const totL = courses.reduce((s, r) => s + (+r.total_lectures || 0), 0);
+  const weight = fitness.find((r) => r.weight != null);
+  const week = fitness.filter((r) => r.date >= daysAgo(7)).length;
+  const reading = books.filter((r) => r.status === 'reading').length;
+  const finished = books.filter((r) => r.status === 'finished').length;
+  const followers = mindpick.find((r) => r.followers != null);
+  const mDone = military.filter((r) => r.status === 'done').length;
+
+  const tile = (k, v) => {
+    const t = el('div', 'tile');
+    t.append(el('div', 'k', k), el('div', 'v', v));
+    return t;
+  };
+
+  grid.append(
+    tile('강의 진도', totL ? `${pct(doneL, totL)}%` : '—'),
+    tile('현재 체중', weight ? `${weight.weight}kg` : '—'),
+    tile('이번 주 운동', `${week}일`),
+    tile('읽는 중', `${reading}권`),
+    tile('팔로워', followers ? num(followers.followers) : '—'),
+    tile('군대 준비', military.length ? `${mDone}/${military.length}` : '—')
+  );
+  c.append(grid);
+  view.append(c);
+
+  if (totL) {
+    const c2 = card('강의');
+    bar(c2, '전체 진도', doneL, totL, `${doneL} / ${totL}강`);
+    view.append(c2);
+  }
+
+  const todo = military.filter((r) => r.status !== 'done')
+    .sort((a, b) => (a.target_date || '9999').localeCompare(b.target_date || '9999'))
+    .slice(0, 5);
+
+  if (todo.length) {
+    const c3 = card('군대 준비 — 남은 것');
+    todo.forEach((r) => {
+      const it = el('div', 'item');
+      it.append(el('div', 'dot ' + (r.priority || 'medium')));
+      const g = el('div', 'grow');
+      g.append(el('div', 't', r.task));
+      if (r.target_date) g.append(el('div', 'm', r.target_date));
+      it.append(g);
+      const b = el('button', 'mini go', '완료');
+      b.onclick = () => patch('military', r.id, { status: 'done', completed_at: new Date().toISOString() });
+      it.append(b);
+      c3.append(it);
+    });
+    view.append(c3);
+  }
+
+  if (!courses.length && !fitness.length && !books.length && !mindpick.length && !military.length) {
+    const c4 = card();
+    c4.append(el('div', 'empty', '아직 데이터가 없어. 위 탭에서 하나씩 추가해봐.'));
+    view.append(c4);
+  }
+}
+
+async function viewCourses(view) {
+  const rows = await load('courses');
+  const c = card('강의 진도');
+
+  if (!rows.length) c.append(el('div', 'empty', '등록된 강의 없음'));
+  rows.forEach((r) => {
+    const done = +r.completed_lectures || 0;
+    const tot = +r.total_lectures || 0;
+    bar(c, r.name, done, tot, `${done} / ${tot}강`);
+    const it = el('div', 'item');
+    it.append(el('div', 'grow'));
+    const minus = el('button', 'mini', '−1');
+    minus.onclick = () => patch('courses', r.id, { completed_lectures: Math.max(0, done - 1) });
+    const plus = el('button', 'mini go', '+1강');
+    plus.onclick = () => patch('courses', r.id, {
+      completed_lectures: Math.min(tot || done + 1, done + 1),
+      status: tot && done + 1 >= tot ? 'done' : 'in_progress'
+    });
+    const del = el('button', 'mini danger', '삭제');
+    del.onclick = () => remove('courses', r.id, r.name);
+    it.append(minus, plus, del);
+    c.append(it);
+  });
+  view.append(c);
+
+  const f = card();
+  f.append(collapsed('＋ 강의 추가', form([
+    { key: 'name', label: '강의명', placeholder: '예) 퍼포먼스 마케팅 실무' },
+    { key: 'platform', label: '플랫폼', placeholder: '예) 인프런', half: true },
+    { key: 'total_lectures', label: '총 강의 수', type: 'number', half: true },
+    { key: 'completed_lectures', label: '들은 강의 수', type: 'number', value: '0' },
+    { key: 'url', label: '링크 (선택)', placeholder: 'https://' }
+  ], (b) => save('courses', b))));
+  view.append(f);
+}
+
+async function viewFitness(view) {
+  const rows = await load('fitness');
+  const c = card('피트니스');
+
+  const withW = rows.filter((r) => r.weight != null);
+  if (withW.length) {
+    const latest = withW[0];
+    const prev = withW[1];
+    const head = el('div');
+    head.append(el('div', 'big', latest.weight + 'kg'));
+    let s = latest.date;
+    if (prev) {
+      const d = (latest.weight - prev.weight).toFixed(1);
+      s += `  ·  이전 대비 ${d > 0 ? '▲' : d < 0 ? '▼' : '–'} ${Math.abs(d)}kg`;
+    }
+    head.append(el('div', 'sub', s));
+    c.append(head);
+  }
+  bar(c, '이번 주 운동', rows.filter((r) => r.date >= daysAgo(7)).length, 7,
+      `${rows.filter((r) => r.date >= daysAgo(7)).length} / 7일`);
+  view.append(c);
+
+  const f = card();
+  f.append(collapsed('＋ 오늘 기록 추가', form([
+    { key: 'date', label: '날짜', type: 'date', value: today() },
+    { key: 'weight', label: '체중 (kg)', type: 'number', step: '0.1', half: true },
+    { key: 'body_fat', label: '체지방 (%)', type: 'number', step: '0.1', half: true },
+    { key: 'exercise_type', label: '운동', placeholder: '예) 등 + 이두' },
+    { key: 'sets', label: '세트', type: 'number', half: true },
+    { key: 'reps', label: '횟수', type: 'number', half: true },
+    { key: 'notes', label: '메모', type: 'textarea' }
+  ], (b) => save('fitness', b))));
+  view.append(f);
+
+  if (rows.length) {
+    const h = card('최근 기록');
+    rows.slice(0, 15).forEach((r) => {
+      const it = el('div', 'item');
+      const g = el('div', 'grow');
+      g.append(el('div', 't', r.exercise_type || '기록'));
+      g.append(el('div', 'm', [r.date, r.weight ? r.weight + 'kg' : null,
+        r.sets ? `${r.sets}세트` : null].filter(Boolean).join(' · ')));
+      it.append(g);
+      const del = el('button', 'mini danger', '삭제');
+      del.onclick = () => remove('fitness', r.id, r.date + ' 기록');
+      it.append(del);
+      h.append(it);
+    });
+    view.append(h);
+  }
+}
+
+async function viewBooks(view) {
+  const rows = await load('books');
+  const reading = rows.filter((r) => r.status === 'reading');
+
+  const c = card('독서');
+  c.append(el('div', 'sub',
+    `읽는 중 ${reading.length}권 · 완독 ${rows.filter((r) => r.status === 'finished').length}권 · 전체 ${rows.length}권`));
+  if (!reading.length) c.append(el('div', 'empty', '지금 읽는 중인 책 없음'));
+  reading.forEach((r) => {
+    bar(c, r.title, +r.current_page || 0, +r.total_pages || 0,
+        r.total_pages ? `${r.current_page || 0} / ${r.total_pages}p` : '쪽수 미입력');
+    const it = el('div', 'item');
+    it.append(el('div', 'grow'));
+    const upd = el('button', 'mini', '쪽수');
+    upd.onclick = () => {
+      const v = prompt(`"${r.title}" 지금 몇 쪽?`, r.current_page || 0);
+      if (v !== null && v.trim() !== '') patch('books', r.id, { current_page: v.trim() });
+    };
+    const fin = el('button', 'mini go', '완독');
+    fin.onclick = () => patch('books', r.id, { status: 'finished', finished_at: today() });
+    it.append(upd, fin);
+    c.append(it);
+  });
+  view.append(c);
+
+  const f = card();
+  f.append(collapsed('＋ 책 추가', form([
+    { key: 'title', label: '제목' },
+    { key: 'author', label: '저자', half: true },
+    { key: 'total_pages', label: '총 쪽수', type: 'number', half: true },
+    { key: 'status', label: '상태', type: 'select', options: [
+      ['want_to_read', '읽고 싶은'], ['reading', '읽는 중'], ['finished', '완독']
+    ] },
+    { key: 'notes', label: '메모', type: 'textarea' }
+  ], (b) => save('books', b))));
+  view.append(f);
+
+  const others = rows.filter((r) => r.status !== 'reading');
+  if (others.length) {
+    const h = card('전체 목록');
+    others.forEach((r) => {
+      const it = el('div', 'item');
+      const g = el('div', 'grow');
+      g.append(el('div', 't', r.title));
+      g.append(el('div', 'm', [r.author, r.status === 'finished' ? '완독' : '읽고 싶은']
+        .filter(Boolean).join(' · ')));
+      it.append(g);
+      if (r.status !== 'finished') {
+        const st = el('button', 'mini go', '시작');
+        st.onclick = () => patch('books', r.id, { status: 'reading', started_at: today() });
+        it.append(st);
+      }
+      const del = el('button', 'mini danger', '삭제');
+      del.onclick = () => remove('books', r.id, r.title);
+      it.append(del);
+      h.append(it);
+    });
+    view.append(h);
+  }
+}
+
+async function viewMindpick(view) {
+  const rows = await load('mindpick');
+  const month = rows.filter((r) => r.post_date >= daysAgo(30));
+  const followers = rows.find((r) => r.followers != null);
+
+  const c = card('마인드픽');
+  const grid = el('div', 'grid');
+  const tile = (k, v) => { const t = el('div', 'tile'); t.append(el('div','k',k), el('div','v',v)); return t; };
+  const avg = month.length ? Math.round(month.reduce((s, r) => s + (+r.reach || 0), 0) / month.length) : 0;
+  grid.append(
+    tile('팔로워', followers ? num(followers.followers) : '—'),
+    tile('30일 게시물', month.length + '개'),
+    tile('평균 도달', num(avg)),
+    tile('전체 게시물', rows.length + '개')
+  );
+  c.append(grid);
+  view.append(c);
+
+  const f = card();
+  f.append(collapsed('＋ 게시물 기록', form([
+    { key: 'post_date', label: '게시일', type: 'date', value: today() },
+    { key: 'content', label: '내용 / 주제', type: 'textarea' },
+    { key: 'reach', label: '도달', type: 'number', half: true },
+    { key: 'likes', label: '좋아요', type: 'number', half: true },
+    { key: 'comments', label: '댓글', type: 'number', half: true },
+    { key: 'saves', label: '저장', type: 'number', half: true },
+    { key: 'followers', label: '현재 팔로워 수', type: 'number' },
+    { key: 'post_url', label: '링크 (선택)', placeholder: 'https://' }
+  ], (b) => save('mindpick', b))));
+  view.append(f);
+
+  if (rows.length) {
+    const h = card('기록');
+    rows.slice(0, 20).forEach((r) => {
+      const it = el('div', 'item');
+      const g = el('div', 'grow');
+      g.append(el('div', 't', r.content || r.post_date));
+      g.append(el('div', 'm',
+        `${r.post_date} · 도달 ${num(r.reach)} · ❤️ ${num(r.likes)} · 💬 ${num(r.comments)}`));
+      it.append(g);
+      const del = el('button', 'mini danger', '삭제');
+      del.onclick = () => remove('mindpick', r.id, r.post_date + ' 게시물');
+      it.append(del);
+      h.append(it);
+    });
+    view.append(h);
+  }
+}
+
+async function viewMilitary(view) {
+  const rows = await load('military');
+  const done = rows.filter((r) => r.status === 'done');
+  const todo = rows.filter((r) => r.status !== 'done')
+    .sort((a, b) => (a.target_date || '9999').localeCompare(b.target_date || '9999'));
+
+  const c = card('군대 준비');
+  bar(c, '진행률', done.length, rows.length, `${done.length} / ${rows.length}개`);
+  if (!rows.length) c.append(el('div', 'empty', '등록된 항목 없음'));
+  todo.forEach((r) => {
+    const it = el('div', 'item');
+    it.append(el('div', 'dot ' + (r.priority || 'medium')));
+    const g = el('div', 'grow');
+    g.append(el('div', 't', r.task));
+    const meta = [r.category, r.target_date].filter(Boolean).join(' · ');
+    if (meta) g.append(el('div', 'm', meta));
+    it.append(g);
+    const ok = el('button', 'mini go', '완료');
+    ok.onclick = () => patch('military', r.id, { status: 'done', completed_at: new Date().toISOString() });
+    const del = el('button', 'mini danger', '삭제');
+    del.onclick = () => remove('military', r.id, r.task);
+    it.append(ok, del);
+    c.append(it);
+  });
+  view.append(c);
+
+  const f = card();
+  f.append(collapsed('＋ 할 일 추가', form([
+    { key: 'task', label: '할 일', placeholder: '예) 신체검사 예약' },
+    { key: 'category', label: '분류', placeholder: '예) 서류', half: true },
+    { key: 'priority', label: '우선순위', type: 'select', options: [
+      ['high', '높음'], ['medium', '보통'], ['low', '낮음']
+    ], half: true },
+    { key: 'target_date', label: '목표일', type: 'date' },
+    { key: 'notes', label: '메모', type: 'textarea' }
+  ], (b) => save('military', b))));
+  view.append(f);
+
+  if (done.length) {
+    const h = card('완료한 것');
+    done.forEach((r) => {
+      const it = el('div', 'item');
+      const g = el('div', 'grow');
+      g.append(el('div', 't', r.task));
+      it.append(g);
+      const undo = el('button', 'mini', '되돌리기');
+      undo.onclick = () => patch('military', r.id, { status: 'pending', completed_at: '' });
+      it.append(undo);
+      h.append(it);
+    });
+    view.append(h);
+  }
+}
+
+const VIEWS = {
+  home: viewHome, courses: viewCourses, fitness: viewFitness,
+  books: viewBooks, mindpick: viewMindpick, military: viewMilitary
+};
+
+/* ---------- 부팅 ---------- */
+
+async function render() {
+  const view = document.getElementById('view');
+  view.innerHTML = '';
+  const loading = card();
+  loading.append(el('div', 'empty', '불러오는 중…'));
+  view.append(loading);
+
+  try {
+    const fresh = document.createElement('div');
+    await VIEWS[current](fresh);
+    view.innerHTML = '';
+    while (fresh.firstChild) view.append(fresh.firstChild);
+  } catch (err) {
+    view.innerHTML = '';
+    const c = card('연결 실패');
+    c.append(el('div', 'err', err.message));
+    const retry = el('button', 'submit', '다시 시도');
+    retry.onclick = render;
+    c.append(retry);
+    view.append(c);
+  }
+}
+
+function buildTabs() {
+  const nav = document.getElementById('tabs');
+  TABS.forEach((t) => {
+    const b = el('button', t.id === current ? 'on' : '', t.label);
+    b.onclick = () => {
+      current = t.id;
+      [...nav.children].forEach((n, i) => n.classList.toggle('on', TABS[i].id === current));
+      window.scrollTo({ top: 0 });
+      render();
+    };
+    nav.append(b);
+  });
+}
+
+buildTabs();
+render();
+</script>
+</body>
+</html>
