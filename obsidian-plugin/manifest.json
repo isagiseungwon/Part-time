@@ -1,0 +1,11 @@
+{
+  "id": "kang-seungwon-dashboard",
+  "name": "Seungwon Kang Dashboard",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Personal project dashboard connected to Supabase",
+  "author": "Seungwon Kang",
+  "authorUrl": "https://github.com/isagiseungwon",
+  "fundingUrl": "",
+  "isDesktopOnly": false
+}
