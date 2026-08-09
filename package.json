@@ -3,13 +3,8 @@
   "version": "1.0.0",
   "description": "Personal project management system for Seungwon Kang",
   "private": true,
-  "scripts": {
-    "dev": "vercel dev",
-    "build": "npm run build:api",
-    "build:api": "echo 'API ready for Vercel deployment'"
-  },
+  "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "^2.38.0"
-  },
-  "devDependencies": {}
+  }
 }
