@@ -240,6 +240,67 @@
   .empty { color: var(--faint); font-size: .83rem; padding: 4px 0; }
   .err { color: var(--urgent); font-size: .84rem; }
 
+  /* ---------- 수정 시트 ---------- */
+
+  .sheetback {
+    position: fixed; inset: 0; z-index: 70;
+    background: rgba(0,0,0,.6);
+    display: flex; align-items: flex-end;
+    opacity: 0; transition: opacity .2s;
+  }
+  .sheetback.open { opacity: 1; }
+  .sheet {
+    width: 100%; max-height: 88vh; overflow-y: auto;
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    border-radius: 20px 20px 0 0;
+    padding: 18px 16px calc(24px + env(safe-area-inset-bottom));
+    transform: translateY(20px); transition: transform .25s cubic-bezier(.2,.8,.3,1);
+  }
+  .sheetback.open .sheet { transform: translateY(0); }
+  .sheethead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+  .sheethead h3 { margin: 0; font-size: .98rem; font-weight: 650; }
+
+  /* ---------- 노트 · 막힌 것 카드 ---------- */
+
+  .entry {
+    background: var(--raised); border: 1px solid var(--line);
+    border-radius: 13px; padding: 13px 14px; margin-bottom: 9px;
+  }
+  .entry:last-child { margin-bottom: 0; }
+  .entry .eh { display: flex; align-items: flex-start; gap: 9px; }
+  .entry .eh .et { flex: 1; min-width: 0; font-size: .9rem; font-weight: 600; line-height: 1.35; }
+  .entry .src { font-size: .72rem; color: var(--faint); margin-top: 3px; }
+  .entry .field { margin-top: 10px; }
+  .entry .field .k {
+    font-size: .68rem; color: var(--faint); letter-spacing: .05em;
+    text-transform: uppercase; margin-bottom: 3px;
+  }
+  .entry .field .v { font-size: .84rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word; }
+  .entry .field.act { border-left: 2px solid var(--accent); padding-left: 9px; }
+  .entry .field.sol { border-left: 2px solid var(--done); padding-left: 9px; }
+  .entry .acts { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: .68rem; font-weight: 650; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); flex: 0 0 auto;
+  }
+  .pill.open   { color: var(--streak); border-color: color-mix(in srgb, var(--streak) 45%, transparent); }
+  .pill.trying { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .pill.solved { color: var(--done);   border-color: color-mix(in srgb, var(--done) 45%, transparent); }
+  .pill.applied{ color: var(--done);   border-color: color-mix(in srgb, var(--done) 45%, transparent); }
+
+  .seg { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin-bottom: 12px; }
+  .seg::-webkit-scrollbar { display: none; }
+  .seg button {
+    flex: 0 0 auto; cursor: pointer; font-family: inherit;
+    background: var(--raised); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 11px; font-size: .76rem;
+  }
+  .seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+
   #toast {
     position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 110px);
     background: var(--raised); border: 1px solid var(--line); color: var(--text);
@@ -277,28 +338,53 @@
 
 const TABS = [
   { id: 'home',     label: '홈' },
+  { id: 'notes',    label: '📝 노트' },
+  { id: 'blockers', label: '🧩 막힌 것' },
+  { id: 'people',   label: '🤝 사람' },
+  { id: 'ideas',    label: '💡 아이디어' },
+  { id: 'books',    label: '📖 독서' },
   { id: 'courses',  label: '📚 강의' },
   { id: 'fitness',  label: '💪 운동' },
-  { id: 'books',    label: '📖 독서' },
   { id: 'mindpick', label: '📱 마인드픽' },
   { id: 'military', label: '🪖 군대' }
 ];
 
-/* 행동 하나당 경험치 */
-const XP = { lecture: 10, workout: 20, page: 0.5, post: 30, task: 25, book: 60 };
+/* 행동 하나당 경험치. 어려운 일일수록 크게. */
+const XP = {
+  lecture: 10, workout: 20, page: 0.5, post: 30, task: 25, book: 60,
+  note: 15, applied: 25, solved: 40, person: 15, idea: 5, shipped: 50
+};
 
 const ACHIEVEMENTS = [
-  { id: 'first',    emo: '🌱', name: '첫 기록',        test: d => total(d) > 0 },
-  { id: 'week',     emo: '🔥', name: '7일 연속',       test: d => streakOf(d) >= 7 },
-  { id: 'month',    emo: '⚡', name: '30일 연속',      test: d => streakOf(d) >= 30 },
-  { id: 'lift10',   emo: '💪', name: '운동 10회',      test: d => d.fitness.length >= 10 },
-  { id: 'read1',    emo: '📖', name: '완독 1권',       test: d => d.books.filter(b => b.status === 'finished').length >= 1 },
-  { id: 'read5',    emo: '📚', name: '완독 5권',       test: d => d.books.filter(b => b.status === 'finished').length >= 5 },
-  { id: 'post10',   emo: '📱', name: '게시물 10개',    test: d => d.mindpick.length >= 10 },
-  { id: 'course1',  emo: '🎓', name: '강의 완주',      test: d => d.courses.some(c => +c.total_lectures > 0 && +c.completed_lectures >= +c.total_lectures) },
-  { id: 'army',     emo: '🪖', name: '군대 준비 완료', test: d => d.military.length > 0 && d.military.every(t => t.status === 'done') },
-  { id: 'lvl5',     emo: '👑', name: '레벨 5',         test: d => levelOf(total(d)).level >= 5 }
+  { id: 'first',    emo: '🌱', name: '첫 기록',      test: d => total(d) > 0 },
+  { id: 'week',     emo: '🔥', name: '7일 연속',     test: d => streakOf(d) >= 7 },
+  { id: 'month',    emo: '⚡', name: '30일 연속',    test: d => streakOf(d) >= 30 },
+  { id: 'lift10',   emo: '💪', name: '운동 10회',    test: d => d.fitness.length >= 10 },
+  { id: 'read1',    emo: '📖', name: '완독 1권',     test: d => d.books.filter(b => b.status === 'finished').length >= 1 },
+  { id: 'read5',    emo: '📚', name: '완독 5권',     test: d => d.books.filter(b => b.status === 'finished').length >= 5 },
+  { id: 'note10',   emo: '📝', name: '노트 10개',    test: d => d.notes.length >= 10 },
+  { id: 'apply5',   emo: '✅', name: '적용 5개',     test: d => d.notes.filter(n => n.applied).length >= 5 },
+  { id: 'solve1',   emo: '🧩', name: '첫 돌파',      test: d => d.blockers.some(b => b.status === 'solved') },
+  { id: 'solve5',   emo: '🔓', name: '5개 돌파',     test: d => d.blockers.filter(b => b.status === 'solved').length >= 5 },
+  { id: 'people5',  emo: '🤝', name: '사람 5명',     test: d => d.people.length >= 5 },
+  { id: 'ship1',    emo: '🚀', name: '아이디어 실현', test: d => d.ideas.some(i => i.status === 'shipped') },
+  { id: 'post10',   emo: '📱', name: '게시물 10개',  test: d => d.mindpick.length >= 10 },
+  { id: 'course1',  emo: '🎓', name: '강의 완주',    test: d => d.courses.some(c => +c.total_lectures > 0 && +c.completed_lectures >= +c.total_lectures) },
+  { id: 'lvl5',     emo: '👑', name: '레벨 5',       test: d => levelOf(total(d)).level >= 5 },
+  { id: 'lvl10',    emo: '🏆', name: '레벨 10',      test: d => levelOf(total(d)).level >= 10 }
 ];
+
+const BLOCKER_CATS = [
+  ['execution',    '실행이 안 됨'],
+  ['career',       '진로'],
+  ['relationship', '관계'],
+  ['skill',        '기술 · 실력'],
+  ['other',        '기타']
+];
+const CAT_LABEL = Object.fromEntries(BLOCKER_CATS);
+
+const IDEA_STATUS = [['seed','씨앗'],['building','만드는 중'],['shipped','내보냄'],['dropped','접음']];
+const IDEA_LABEL = Object.fromEntries(IDEA_STATUS);
 
 /* ============ 유틸 ============ */
 
@@ -335,6 +421,10 @@ function total(d) {
   }
   for (const m of d.mindpick)  xp += XP.post;
   for (const t of d.military)  if (t.status === 'done') xp += XP.task;
+  for (const n of d.notes)     xp += XP.note + (n.applied ? XP.applied : 0);
+  for (const b of d.blockers)  if (b.status === 'solved') xp += XP.solved;
+  for (const p of d.people)    xp += XP.person;
+  for (const i of d.ideas)     xp += XP.idea + (i.status === 'shipped' ? XP.shipped : 0);
   return Math.round(xp);
 }
 
@@ -359,6 +449,10 @@ function activityMap(d) {
   d.books.forEach(r => { add(r.finished_at); add(r.started_at); });
   d.military.forEach(r => add(r.completed_at));
   d.courses.forEach(r => add(r.created_at));
+  d.notes.forEach(r => add(r.created_at));
+  d.blockers.forEach(r => { add(r.created_at); add(r.solved_at); });
+  d.people.forEach(r => { add(r.met_at); add(r.last_contact); });
+  d.ideas.forEach(r => add(r.created_at));
   return m;
 }
 
@@ -375,7 +469,7 @@ function streakOf(d) {
 
 /* ============ API ============ */
 
-const ENDPOINTS = ['courses', 'fitness', 'books', 'mindpick', 'military'];
+const ENDPOINTS = ['courses', 'fitness', 'books', 'mindpick', 'military', 'notes', 'blockers', 'people', 'ideas'];
 let DATA = null;
 let current = 'home';
 
@@ -519,6 +613,38 @@ function form(fields, onSubmit, submitLabel) {
   };
   wrap.append(btn);
   return wrap;
+}
+
+/* 아래에서 올라오는 수정 시트. 기존 값을 채운 폼을 띄우고 PATCH 한다. */
+function openEdit(title, fields, record, endpoint) {
+  const back = el('div', 'sheetback');
+  const sheet = el('div', 'sheet');
+  const head = el('div', 'sheethead');
+  head.append(el('h3', null, title));
+  const x = el('button', 'mini', '닫기');
+  x.onclick = () => back.remove();
+  head.append(x);
+  sheet.append(head);
+
+  const filled = fields.map(f => ({ ...f, value: record[f.key] == null ? '' : String(record[f.key]) }));
+  sheet.append(form(filled, async (body) => {
+    // 비워둔 칸은 명시적으로 지운다. 안 그러면 한 번 쓴 값을 못 지운다.
+    // 필수 칸(required)은 비워도 건드리지 않는다 — DB가 NOT NULL 이라 거절당한다.
+    for (const f of fields) if (!(f.key in body) && !f.required) body[f.key] = '';
+    await patch(endpoint, record.id, body, '수정했어');
+    back.remove();
+  }, '저장'));
+
+  back.append(sheet);
+  back.onclick = (e) => { if (e.target === back) back.remove(); };
+  document.body.append(back);
+  requestAnimationFrame(() => back.classList.add('open'));
+}
+
+function editBtn(title, fields, record, endpoint) {
+  const b = el('button', 'mini', '수정');
+  b.onclick = (e) => { e.stopPropagation(); openEdit(title, fields, record, endpoint); };
+  return b;
 }
 
 function collapsed(title, node, open) {
@@ -683,6 +809,49 @@ function quests(d) {
     act: () => goTab('mindpick')
   });
 
+  /* 적용 안 한 노트가 있으면 새 노트보다 그걸 먼저 민다. */
+  const pending = d.notes.find(n => !n.applied && n.action);
+  if (pending) {
+    out.push({
+      emo: '✅', xp: XP.applied,
+      title: '노트 하나 실제로 적용하기',
+      sub: pending.action.slice(0, 40),
+      done: false,
+      act: () => patch('notes', pending.id, { applied: true, updated_at: new Date().toISOString() }, `+${XP.applied} XP`)
+    });
+  } else {
+    const noted = d.notes.some(n => (n.created_at || '').slice(0, 10) === t);
+    out.push({
+      emo: '📝', xp: XP.note,
+      title: '오늘 배운 것 노트 1개',
+      sub: noted ? '오늘 남김' : '책·강의·경험 아무거나',
+      done: noted,
+      act: () => goTab('notes')
+    });
+  }
+
+  const stuck = d.blockers.filter(b => b.status !== 'solved')[0];
+  if (stuck) {
+    out.push({
+      emo: '🧩', xp: XP.solved,
+      title: '막힌 것 하나 풀기',
+      sub: stuck.title.slice(0, 40),
+      done: false,
+      act: () => goTab('blockers')
+    });
+  }
+
+  const staleP = d.people.find(p => p.keep && (!p.last_contact || p.last_contact < daysAgo(30)));
+  if (staleP) {
+    out.push({
+      emo: '🤝', xp: XP.person,
+      title: `${staleP.name} 에게 먼저 연락`,
+      sub: staleP.next_action || '오래 연락 안 함',
+      done: false,
+      act: () => patch('people', staleP.id, { last_contact: t }, '기록했어')
+    });
+  }
+
   const task = d.military
     .filter(x => x.status !== 'done')
     .sort((a, b) => (a.target_date || '9999').localeCompare(b.target_date || '9999'))[0];
@@ -690,7 +859,7 @@ function quests(d) {
     out.push({
       emo: '🪖', xp: XP.task,
       title: task.task,
-      sub: task.target_date ? `목표 ${task.target_date}` : '군대 준비',
+      sub: task.target_date ? `목표 ${task.target_date}` : '군대',
       done: false,
       act: () => patch('military', task.id, { status: 'done', completed_at: new Date().toISOString() }, `+${XP.task} XP`)
     });
@@ -710,13 +879,19 @@ function stats(d) {
   const month = d.mindpick.filter(m => m.post_date >= daysAgo(29)).length;
   const mDone = d.military.filter(x => x.status === 'done').length;
 
+  const applied = d.notes.filter(n => n.applied).length;
+  const solved  = d.blockers.filter(b => b.status === 'solved').length;
+
   return [
-    { emo: '📚', label: '강의',    pct: totL ? pct(doneL, totL) : null,       detail: totL ? `${doneL}/${totL}강` : '없음' },
-    { emo: '💪', label: '운동',    pct: pct(week, 7),                          detail: `주 ${week}일` },
-    { emo: '📖', label: '독서',    pct: readPct,                               detail: reading.length ? `${reading.length}권 읽는 중` : '없음' },
-    { emo: '📱', label: '마인드픽', pct: pct(month, 12),                        detail: `30일 ${month}개` },
-    { emo: '🪖', label: '군대',    pct: d.military.length ? pct(mDone, d.military.length) : null, detail: d.military.length ? `${mDone}/${d.military.length}` : '없음' },
-    { emo: '🔥', label: '연속',    pct: pct(streakOf(d), 30),                  detail: `${streakOf(d)}일` }
+    { emo: '📝', label: '노트 적용', pct: d.notes.length ? pct(applied, d.notes.length) : null, detail: d.notes.length ? `${applied}/${d.notes.length}` : '없음' },
+    { emo: '🧩', label: '돌파',      pct: d.blockers.length ? pct(solved, d.blockers.length) : null, detail: d.blockers.length ? `${solved}/${d.blockers.length}` : '없음' },
+    { emo: '🔥', label: '연속',      pct: pct(streakOf(d), 30),                 detail: `${streakOf(d)}일` },
+    { emo: '📚', label: '강의',      pct: totL ? pct(doneL, totL) : null,       detail: totL ? `${doneL}/${totL}강` : '없음' },
+    { emo: '💪', label: '운동',      pct: pct(week, 7),                         detail: `주 ${week}일` },
+    { emo: '📖', label: '독서',      pct: readPct,                              detail: reading.length ? `${reading.length}권 읽는 중` : '없음' },
+    { emo: '📱', label: '마인드픽',   pct: pct(month, 12),                       detail: `30일 ${month}개` },
+    { emo: '🤝', label: '사람',      pct: d.people.length ? pct(d.people.filter(p => p.keep).length, d.people.length) : null, detail: d.people.length ? `${d.people.length}명` : '없음' },
+    { emo: '🪖', label: '군대',      pct: d.military.length ? pct(mDone, d.military.length) : null, detail: d.military.length ? `${mDone}/${d.military.length}` : '없음' }
   ];
 }
 
@@ -811,6 +986,22 @@ function viewFitness(view, d) {
   }
 }
 
+const BOOK_FIELDS = [
+  { key: 'title', required: true, label: '제목' },
+  { key: 'author', label: '저자', half: true },
+  { key: 'total_pages', label: '총 쪽수', type: 'number', half: true },
+  { key: 'current_page', label: '현재 쪽', type: 'number', half: true },
+  { key: 'rating', label: '별점 (1~5)', type: 'number', half: true },
+  { key: 'status', label: '상태', type: 'select', options: [['reading','읽는 중'],['want_to_read','읽고 싶은'],['finished','완독']] },
+  { key: 'notes', label: '한 줄 감상', type: 'textarea' }
+];
+
+/* 이 책에서 뽑은 노트로 바로 넘어가는 버튼 */
+function notesOf(d, book) {
+  return d.notes.filter(n => n.source_type === 'book' &&
+    (String(n.source_id) === String(book.id) || (n.source_label || '').includes(book.title)));
+}
+
 function viewBooks(view, d) {
   const rows = d.books;
   const reading = rows.filter(r => r.status === 'reading');
@@ -833,7 +1024,9 @@ function viewBooks(view, d) {
     };
     const fin = el('button', 'mini ok', '완독');
     fin.onclick = () => patch('books', r.id, { status: 'finished', finished_at: today() }, `+${XP.book} XP`);
-    it.append(p10, upd, fin);
+    const nt = el('button', 'mini', `📝 노트 ${notesOf(d, r).length}`);
+    nt.onclick = () => goTab('notes');
+    it.append(p10, upd, fin, nt, editBtn('책 수정', BOOK_FIELDS, r, 'books'));
     c.append(it);
   });
   view.append(c);
@@ -864,7 +1057,7 @@ function viewBooks(view, d) {
       }
       const del = el('button', 'mini danger', '삭제');
       del.onclick = () => remove('books', r.id, r.title);
-      it.append(del);
+      it.append(editBtn('책 수정', BOOK_FIELDS, r, 'books'), del);
       h.append(it);
     });
     view.append(h);
@@ -976,7 +1169,354 @@ function viewMilitary(view, d) {
   }
 }
 
-const VIEWS = { home: viewHome, courses: viewCourses, fitness: viewFitness, books: viewBooks, mindpick: viewMindpick, military: viewMilitary };
+/* ---------- 📝 노트 ---------- */
+
+const NOTE_FIELDS = (d) => [
+  { key: 'title', required: true, label: '한 줄 요약', placeholder: '예) 정체성이 먼저, 행동은 그 다음' },
+  { key: 'source_type', label: '출처 종류', type: 'select', options: [['book','책'],['course','강의'],['life','삶 · 경험']], half: true },
+  { key: 'source_label', label: '출처', placeholder: '예) 역행자 · 3장', half: true },
+  { key: 'quote', label: '원문 / 핵심', type: 'textarea' },
+  { key: 'insight', label: '내 해석 — 이게 왜 중요한가', type: 'textarea' },
+  { key: 'action', label: '적용 — 구체적으로 뭘 할 건가', type: 'textarea' }
+];
+
+function noteCard(n) {
+  const e = el('div', 'entry');
+  const h = el('div', 'eh');
+  h.append(el('div', 'et', n.title));
+  h.append(el('span', 'pill' + (n.applied ? ' applied' : ''), n.applied ? '적용함' : '미적용'));
+  e.append(h);
+
+  const src = [n.source_type === 'book' ? '책' : n.source_type === 'course' ? '강의' : '삶', n.source_label, (n.created_at || '').slice(0, 10)]
+    .filter(Boolean).join(' · ');
+  if (src) e.append(el('div', 'src', src));
+
+  const fld = (k, v, cls) => {
+    if (!v) return;
+    const f = el('div', 'field' + (cls ? ' ' + cls : ''));
+    f.append(el('div', 'k', k), el('div', 'v', v));
+    e.append(f);
+  };
+  fld('원문', n.quote);
+  fld('내 해석', n.insight);
+  fld('적용', n.action, 'act');
+
+  const acts = el('div', 'acts');
+  const tog = el('button', 'mini' + (n.applied ? '' : ' ok'), n.applied ? '미적용으로' : `적용함 (+${XP.applied}XP)`);
+  tog.onclick = () => patch('notes', n.id, { applied: !n.applied, updated_at: new Date().toISOString() },
+    n.applied ? '되돌림' : `+${XP.applied} XP`);
+  const del = el('button', 'mini danger', '삭제');
+  del.onclick = () => remove('notes', n.id, n.title);
+  acts.append(tog, editBtn('노트 수정', NOTE_FIELDS(), n, 'notes'), del);
+  e.append(acts);
+  return e;
+}
+
+function viewNotes(view, d) {
+  const rows = d.notes;
+  const applied = rows.filter(n => n.applied).length;
+
+  const head = card('노트');
+  const g = el('div', 'rings');
+  const tile = (emo, v, label) => {
+    const c = el('div', 'ringcell');
+    const n = el('div', null, v);
+    n.style.cssText = 'font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums';
+    c.append(el('div', null, emo), n, el('div', 'lab', label));
+    return c;
+  };
+  g.append(tile('📝', String(rows.length), '전체'), tile('✅', String(applied), '적용함'), tile('⏳', String(rows.length - applied), '아직'));
+  head.append(g);
+  view.append(head);
+
+  const f = card();
+  f.append(collapsed('＋ 노트 추가', form(NOTE_FIELDS(), b => {
+    b.source_type = b.source_type || 'book';
+    return save('notes', b, `+${XP.note} XP`);
+  }), !rows.length));
+  view.append(f);
+
+  if (!rows.length) {
+    const e = card();
+    e.append(el('div', 'empty', '책이나 강의에서 건진 것 하나만 적어봐. 나중에 여기서 다시 찾아 읽고, 적용했는지 체크할 수 있어.'));
+    view.append(e);
+    return;
+  }
+
+  const notApplied = rows.filter(n => !n.applied);
+  if (notApplied.length) {
+    const c = card(`아직 적용 안 한 것 ${notApplied.length}개`);
+    notApplied.forEach(n => c.append(noteCard(n)));
+    view.append(c);
+  }
+  const done = rows.filter(n => n.applied);
+  if (done.length) {
+    const c = card(`적용한 것 ${done.length}개`);
+    done.forEach(n => c.append(noteCard(n)));
+    view.append(c);
+  }
+}
+
+/* ---------- 🧩 막힌 것 ---------- */
+
+const BLOCKER_FIELDS = [
+  { key: 'title', required: true, label: '무엇이 막혔나', placeholder: '예) 릴스를 찍긴 하는데 끝까지 안 봄' },
+  { key: 'category', label: '분류', type: 'select', options: BLOCKER_CATS, half: true },
+  { key: 'source', label: '어디서 나왔나', placeholder: '예) 힉스필드 강의', half: true },
+  { key: 'detail', label: '구체적으로 어떤 상황인지', type: 'textarea' },
+  { key: 'attempts', label: '시도해본 것', type: 'textarea' },
+  { key: 'solution', label: '찾은 해결점', type: 'textarea' }
+];
+
+let blockerFilter = 'all';
+
+function viewBlockers(view, d) {
+  const rows = d.blockers;
+  const solved = rows.filter(b => b.status === 'solved');
+
+  const head = card('막힌 것 → 해결');
+  bar(head, '돌파율', solved.length, rows.length, `${solved.length} / ${rows.length}개`);
+  head.append(el('div', 'empty', '실행이 막히는 지점을 적어두고, 해결점을 찾으면 채운다.'));
+  view.append(head);
+
+  const f = card();
+  f.append(collapsed('＋ 막힌 것 추가', form(BLOCKER_FIELDS, b => {
+    b.category = b.category || 'execution';
+    b.status = b.solution ? 'solved' : 'open';
+    if (b.solution) b.solved_at = new Date().toISOString();
+    return save('blockers', b, b.solution ? `+${XP.solved} XP` : '기록했어');
+  }), !rows.length));
+  view.append(f);
+
+  if (!rows.length) return;
+
+  const listCard = card();
+  const seg = el('div', 'seg');
+  [['all', '전체'], ...BLOCKER_CATS].forEach(([v, t]) => {
+    const b = el('button', blockerFilter === v ? 'on' : '', t);
+    b.onclick = () => { blockerFilter = v; render(); };
+    seg.append(b);
+  });
+  listCard.append(seg);
+
+  const shown = rows.filter(b => blockerFilter === 'all' || b.category === blockerFilter);
+  const order = { open: 0, trying: 1, solved: 2 };
+  shown.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
+
+  if (!shown.length) listCard.append(el('div', 'empty', '이 분류엔 없어'));
+
+  shown.forEach(b => {
+    const e = el('div', 'entry');
+    const h = el('div', 'eh');
+    h.append(el('div', 'et', b.title));
+    h.append(el('span', 'pill ' + b.status, b.status === 'solved' ? '해결' : b.status === 'trying' ? '시도 중' : '막힘'));
+    e.append(h);
+
+    const src = [CAT_LABEL[b.category] || b.category, b.source].filter(Boolean).join(' · ');
+    if (src) e.append(el('div', 'src', src));
+
+    const fld = (k, v, cls) => {
+      if (!v) return;
+      const x = el('div', 'field' + (cls ? ' ' + cls : ''));
+      x.append(el('div', 'k', k), el('div', 'v', v));
+      e.append(x);
+    };
+    fld('상황', b.detail);
+    fld('시도한 것', b.attempts);
+    fld('해결점', b.solution, 'sol');
+
+    const acts = el('div', 'acts');
+    if (b.status !== 'solved') {
+      if (b.status === 'open') {
+        const t = el('button', 'mini', '시도 중으로');
+        t.onclick = () => patch('blockers', b.id, { status: 'trying' });
+        acts.append(t);
+      }
+      const s = el('button', 'mini ok', `해결됨 (+${XP.solved}XP)`);
+      s.onclick = () => {
+        const v = prompt('어떻게 풀었어? (해결점)', b.solution || '');
+        if (v === null) return;
+        patch('blockers', b.id, { status: 'solved', solution: v, solved_at: new Date().toISOString() }, `+${XP.solved} XP`);
+      };
+      acts.append(s);
+    } else {
+      const u = el('button', 'mini', '다시 열기');
+      u.onclick = () => patch('blockers', b.id, { status: 'open', solved_at: '' });
+      acts.append(u);
+    }
+    const del = el('button', 'mini danger', '삭제');
+    del.onclick = () => remove('blockers', b.id, b.title);
+    acts.append(editBtn('막힌 것 수정', BLOCKER_FIELDS, b, 'blockers'), del);
+    e.append(acts);
+    listCard.append(e);
+  });
+  view.append(listCard);
+}
+
+/* ---------- 🤝 사람 ---------- */
+
+const PEOPLE_FIELDS = [
+  { key: 'name', required: true, label: '이름 / 닉네임' },
+  { key: 'met_where', label: '어디서', placeholder: '예) 스레드 DM, 독서모임', half: true },
+  { key: 'met_at', label: '처음 만난 날', type: 'date', half: true },
+  { key: 'tags', label: '태그', placeholder: '예) 마케팅, 영상, 글쓰기' },
+  { key: 'learned', label: '이 사람에게서 배운 것', type: 'textarea' },
+  { key: 'next_action', label: '다음에 할 것', placeholder: '예) 만든 릴스 보여주고 피드백 받기' },
+  { key: 'last_contact', label: '마지막 연락', type: 'date' }
+];
+
+function viewPeople(view, d) {
+  const rows = d.people;
+  const stale = rows.filter(p => p.keep && (!p.last_contact || p.last_contact < daysAgo(30)));
+
+  const head = card('사람');
+  const g = el('div', 'rings');
+  const tile = (emo, v, label) => {
+    const c = el('div', 'ringcell');
+    const n = el('div', null, v);
+    n.style.cssText = 'font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums';
+    c.append(el('div', null, emo), n, el('div', 'lab', label));
+    return c;
+  };
+  g.append(
+    tile('🤝', String(rows.length), '전체'),
+    tile('⭐', String(rows.filter(p => p.keep).length), '이어갈 사람'),
+    tile('📮', String(stale.length), '연락한 지 오래')
+  );
+  head.append(g);
+  view.append(head);
+
+  const f = card();
+  f.append(collapsed('＋ 사람 추가', form(PEOPLE_FIELDS, b => save('people', b, `+${XP.person} XP`)), !rows.length));
+  view.append(f);
+
+  if (!rows.length) {
+    const e = card();
+    e.append(el('div', 'empty',
+      '오프라인에서 만나기 어려운 상황이면 온라인 접점을 세는 게 낫다. 스레드에서 답글 준 사람, 댓글 단 사람, 도움 받은 사람부터 하나씩.'));
+    view.append(e);
+    return;
+  }
+
+  if (stale.length) {
+    const c = card(`먼저 연락해볼 사람 ${stale.length}명`);
+    stale.forEach(p => {
+      const it = el('div', 'item');
+      const g2 = el('div', 'grow');
+      g2.append(el('div', 't', p.name));
+      g2.append(el('div', 'm', p.next_action || (p.last_contact ? `마지막 연락 ${p.last_contact}` : '연락 기록 없음')));
+      it.append(g2);
+      const ok = el('button', 'mini go', '연락함');
+      ok.onclick = () => patch('people', p.id, { last_contact: today() }, '기록했어');
+      it.append(ok);
+      c.append(it);
+    });
+    view.append(c);
+  }
+
+  const listCard = card('전체');
+  rows.forEach(p => {
+    const e = el('div', 'entry');
+    const h = el('div', 'eh');
+    h.append(el('div', 'et', p.name));
+    if (p.keep) h.append(el('span', 'pill applied', '이어감'));
+    e.append(h);
+    const src = [p.met_where, p.met_at, p.tags].filter(Boolean).join(' · ');
+    if (src) e.append(el('div', 'src', src));
+    const fld = (k, v, cls) => {
+      if (!v) return;
+      const x = el('div', 'field' + (cls ? ' ' + cls : ''));
+      x.append(el('div', 'k', k), el('div', 'v', v));
+      e.append(x);
+    };
+    fld('배운 것', p.learned);
+    fld('다음에 할 것', p.next_action, 'act');
+
+    const acts = el('div', 'acts');
+    const ct = el('button', 'mini', '오늘 연락함');
+    ct.onclick = () => patch('people', p.id, { last_contact: today() }, '기록했어');
+    const kp = el('button', 'mini', p.keep ? '이어가기 해제' : '이어갈 사람');
+    kp.onclick = () => patch('people', p.id, { keep: !p.keep });
+    const del = el('button', 'mini danger', '삭제');
+    del.onclick = () => remove('people', p.id, p.name);
+    acts.append(ct, kp, editBtn('사람 수정', PEOPLE_FIELDS, p, 'people'), del);
+    e.append(acts);
+    listCard.append(e);
+  });
+  view.append(listCard);
+}
+
+/* ---------- 💡 아이디어 ---------- */
+
+const IDEA_FIELDS = [
+  { key: 'title', required: true, label: '아이디어' },
+  { key: 'category', label: '분류', placeholder: '예) 콘텐츠 / 제품 / 사업', half: true },
+  { key: 'status', label: '상태', type: 'select', options: IDEA_STATUS, half: true },
+  { key: 'detail', label: '설명 — 누구의 어떤 문제를 푸는가', type: 'textarea' }
+];
+
+function viewIdeas(view, d) {
+  const rows = d.ideas;
+
+  const head = card('아이디어함');
+  head.append(el('div', 'empty', '떠오른 걸 흘려보내지 않는 곳. 씨앗 → 만드는 중 → 내보냄 으로 옮긴다.'));
+  view.append(head);
+
+  const f = card();
+  f.append(collapsed('＋ 아이디어 추가', form(IDEA_FIELDS, b => {
+    b.status = b.status || 'seed';
+    return save('ideas', b, `+${XP.idea} XP`);
+  }), !rows.length));
+  view.append(f);
+
+  if (!rows.length) return;
+
+  IDEA_STATUS.forEach(([st, label]) => {
+    const group = rows.filter(i => i.status === st);
+    if (!group.length) return;
+    const c = card(`${label} ${group.length}`);
+    group.forEach(i => {
+      const e = el('div', 'entry');
+      const h = el('div', 'eh');
+      h.append(el('div', 'et', i.title));
+      h.append(el('span', 'pill' + (st === 'shipped' ? ' solved' : st === 'building' ? ' trying' : ''), label));
+      e.append(h);
+      if (i.category) e.append(el('div', 'src', i.category));
+      if (i.detail) {
+        const x = el('div', 'field');
+        x.append(el('div', 'k', '설명'), el('div', 'v', i.detail));
+        e.append(x);
+      }
+      const acts = el('div', 'acts');
+      if (st === 'seed') {
+        const b1 = el('button', 'mini go', '만들기 시작');
+        b1.onclick = () => patch('ideas', i.id, { status: 'building' });
+        acts.append(b1);
+      }
+      if (st === 'building') {
+        const b2 = el('button', 'mini ok', `내보냄 (+${XP.shipped}XP)`);
+        b2.onclick = () => patch('ideas', i.id, { status: 'shipped' }, `+${XP.shipped} XP`);
+        acts.append(b2);
+      }
+      if (st !== 'dropped' && st !== 'shipped') {
+        const b3 = el('button', 'mini', '접기');
+        b3.onclick = () => patch('ideas', i.id, { status: 'dropped' });
+        acts.append(b3);
+      }
+      const del = el('button', 'mini danger', '삭제');
+      del.onclick = () => remove('ideas', i.id, i.title);
+      acts.append(editBtn('아이디어 수정', IDEA_FIELDS, i, 'ideas'), del);
+      e.append(acts);
+      c.append(e);
+    });
+    view.append(c);
+  });
+}
+
+const VIEWS = {
+  home: viewHome, notes: viewNotes, blockers: viewBlockers, people: viewPeople, ideas: viewIdeas,
+  courses: viewCourses, fitness: viewFitness, books: viewBooks, mindpick: viewMindpick, military: viewMilitary
+};
 
 /* ============ 부팅 ============ */
 
