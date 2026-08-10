@@ -25,16 +25,18 @@ const RESOURCES = {
                fields: ['title', 'detail', 'category', 'status'] },
   mastery:   { table: 'me_mastery',       orderBy: 'created_at',
                fields: ['category', 'term', 'meaning', 'cue', 'why', 'level', 'reps', 'lapses',
-                        'unaided_count', 'last_review', 'next_review'] },
+                        'unaided_count', 'last_review', 'next_review', 'when_cue'] },
   drills:    { table: 'me_drills',        orderBy: 'date',
                fields: ['date', 'mastery_id', 'term_snapshot', 'recalled', 'unaided', 'note'] },
   selfcheck: { table: 'me_selfcheck',     orderBy: 'date',
                fields: ['date', 'area', 'self_score', 'other_score', 'evidence', 'gap_note', 'action'] },
   goals:     { table: 'me_goals',         orderBy: 'created_at',
                fields: ['title', 'category', 'metric', 'start_value', 'current_value', 'target_value',
-                        'direction', 'deadline', 'why', 'status', 'updated_at'] },
+                        'direction', 'deadline', 'why', 'status', 'when_cue', 'updated_at'] },
   steps:     { table: 'me_steps',         orderBy: 'order_index',
-               fields: ['goal_id', 'title', 'order_index', 'done', 'done_at', 'target_date', 'note'] }
+               fields: ['goal_id', 'title', 'order_index', 'done', 'done_at', 'target_date', 'note', 'when_cue'] },
+  reviews:   { table: 'me_reviews',       orderBy: 'week_start',
+               fields: ['week_start', 'went_well', 'went_bad', 'focus', 'snapshot'] }
 };
 
 const HANDLERS = Object.fromEntries(
