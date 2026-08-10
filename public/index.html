@@ -576,6 +576,16 @@
   .field.sol { border-left: 2px solid var(--done); padding-left: 9px; }
   .entry .acts { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
 
+  /* ---------- 기록함 ---------- */
+  .daysep {
+    font-size: .72rem; font-weight: 700; color: var(--faint);
+    letter-spacing: .06em; padding: 14px 0 6px; font-variant-numeric: tabular-nums;
+  }
+  .daysep:first-child { padding-top: 0; }
+  .item.arch { align-items: flex-start; gap: 12px; }
+  .item.arch .aemo { font-size: 1.15rem; line-height: 1.4; flex: 0 0 auto; }
+  .item.arch .pill { align-self: flex-start; }
+
   /* ---------- 목표 ---------- */
 
   .goal { background:
@@ -689,6 +699,8 @@ const TABS = [
   { id: 'goals',     emo: '🎯', name: '목표' },
   { id: 'mastery',   emo: '🧠', name: '숙달' },
   { id: 'notes',     emo: '📝', name: '노트' },
+  { id: 'income',    emo: '💰', name: '수익' },
+  { id: 'archive',   emo: '📜', name: '기록함' },
   { id: 'review',    emo: '📅', name: '주간 회고' },
   { id: 'selfcheck', emo: '🪞', name: '메타인지' },
   { id: 'blockers',  emo: '🧩', name: '막힌 것' },
@@ -938,7 +950,7 @@ const streakOf = (d) => streakInfo(d).days;
 /* ============ API ============ */
 
 const ENDPOINTS = ['courses', 'fitness', 'books', 'mindpick', 'military', 'notes', 'blockers',
-                   'people', 'ideas', 'mastery', 'drills', 'selfcheck', 'goals', 'steps', 'reviews'];
+                   'people', 'ideas', 'mastery', 'drills', 'selfcheck', 'goals', 'steps', 'reviews', 'income'];
 let DATA = null;
 let current = 'home';
 
@@ -1342,6 +1354,12 @@ function openQuickAdd(d) {
     item('📝', '노트', '방금 배운 것', () => {
       const v = prompt('한 줄 요약');
       if (v && v.trim()) save('notes', { title: v.trim(), source_type: 'life' }, `+${XP.note} XP`);
+    });
+    item('💰', '수입', '들어온 돈', () => {
+      const v = prompt('얼마? (원)');
+      if (!v || !v.trim()) return;
+      const src = prompt('어디서?') || '기타';
+      save('income', { date: today(), kind: 'income', amount: v.trim(), source: src }, '기록했어');
     });
     item('💡', '아이디어', '떠오른 것', () => {
       const v = prompt('아이디어');
@@ -2080,6 +2098,267 @@ function viewMilitary(view, d) {
   }
 }
 
+/* ---------- 💰 수익 ---------- */
+
+const money = (n) => {
+  const v = Math.round(+n || 0);
+  const a = Math.abs(v);
+  if (a >= 100000000) return (v / 100000000).toFixed(a >= 1000000000 ? 0 : 2).replace(/\.00$/, '') + '억';
+  if (a >= 10000)     return Math.round(v / 10000).toLocaleString('ko-KR') + '만';
+  return v.toLocaleString('ko-KR');
+};
+
+const monthKey = (v) => String(v).slice(0, 7);
+const thisMonth = () => monthKey(today());
+function monthsBack(n) {
+  const d = new Date();
+  d.setDate(1); d.setMonth(d.getMonth() - n);
+  return d.toISOString().slice(0, 7);
+}
+
+function monthNet(d, mk) {
+  let inc = 0, exp = 0;
+  d.income.forEach(r => {
+    if (monthKey(r.date) !== mk) return;
+    if (r.kind === 'expense') exp += +r.amount || 0; else inc += +r.amount || 0;
+  });
+  return { inc, exp, net: inc - exp };
+}
+
+const INCOME_FIELDS = [
+  { key: 'date', label: '날짜', type: 'date' },
+  { key: 'kind', label: '종류', type: 'select', options: [['income', '수입'], ['expense', '지출']], half: true },
+  { key: 'amount', required: true, label: '금액 (원)', type: 'number', half: true },
+  { key: 'source', required: true, label: '어디서', placeholder: '예) 마인드픽 제휴 / 영상 외주' },
+  { key: 'note', label: '메모', type: 'textarea' }
+];
+
+function viewIncome(view, d) {
+  const target = +(d.settings?.income_target || 100000000);
+  const cur = monthNet(d, thisMonth());
+  const prev = monthNet(d, monthsBack(1));
+  const best = d.income.length
+    ? Math.max(...[...new Set(d.income.map(r => monthKey(r.date)))].map(mk => monthNet(d, mk).net))
+    : 0;
+
+  /* 북극성 */
+  const head = el('div', 'card herocard');
+  head.append(el('h2', null, '이번 달 순이익'));
+  const big = el('div');
+  big.style.cssText = 'font-size:2.5rem;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums;line-height:1.1';
+  big.textContent = money(cur.net) + '원';
+  head.append(big);
+
+  const sub = el('div', 'next');
+  const diff = cur.net - prev.net;
+  sub.textContent = `수입 ${money(cur.inc)} · 지출 ${money(cur.exp)}` +
+    (prev.net ? `  ·  지난달 대비 ${diff >= 0 ? '▲' : '▼'} ${money(Math.abs(diff))}` : '');
+  head.append(sub);
+
+  const tr = el('div', 'xptrack');
+  const tf = el('div', 'xpfill');
+  tf.style.width = '0%';
+  requestAnimationFrame(() => { tf.style.width = pct(Math.max(0, cur.net), target) + '%'; });
+  tr.append(tf);
+  head.append(tr);
+
+  /* 절대 퍼센트만 보면 매일 0%라 사람 죽는다. 배수로 말한다. */
+  const gap = el('div', 'need');
+  if (cur.net >= target) gap.textContent = `목표 달성. 월 ${money(target)}원 넘겼다 🎉`;
+  else if (cur.net > 0) gap.textContent = `목표 ${money(target)}원까지 — 지금의 ${(target / cur.net).toFixed(1)}배`;
+  else gap.textContent = `목표 ${money(target)}원. 첫 1원부터가 배수의 시작이다.`;
+  head.append(gap);
+
+  const setBtn = el('button', 'mini', '목표 금액 바꾸기');
+  setBtn.style.marginTop = '12px';
+  setBtn.onclick = () => {
+    const v = prompt('월 순이익 목표 (원)', String(target));
+    if (v && v.trim()) api('settings', { method: 'POST', body: JSON.stringify({ income_target: v.trim() }) })
+      .then(() => { DATA = null; toast('바꿨어', 'good'); render(); });
+  };
+  head.append(setBtn);
+  view.append(head);
+
+  /* 역산 — 목표를 오늘 팔 것으로 바꾼다 */
+  const calc = card('역산');
+  calc.append(el('div', 'empty', '객단가를 정하면 몇 명이 필요한지 나온다. 막연한 1억이 사람 수로 바뀐다.'));
+  const rows = [10000, 30000, 100000, 300000, 1000000];
+  rows.forEach(p => {
+    const need = Math.ceil(target / p);
+    const r = el('div', 'item');
+    const g = el('div', 'grow');
+    g.append(el('div', 't', `객단가 ${money(p)}원`));
+    g.append(el('div', 'm', `한 달 ${need.toLocaleString('ko-KR')}명 · 하루 ${Math.ceil(need / 30).toLocaleString('ko-KR')}명`));
+    r.append(g);
+    calc.append(r);
+  });
+  view.append(calc);
+
+  /* 월별 추이 */
+  if (d.income.length) {
+    const tc = card('월별 순이익');
+    const maxAbs = Math.max(1, best, ...[0, 1, 2, 3, 4, 5].map(i => Math.abs(monthNet(d, monthsBack(i)).net)));
+    for (let i = 5; i >= 0; i--) {
+      const mk = monthsBack(i);
+      const n = monthNet(d, mk).net;
+      bar(tc, mk, Math.max(0, n), maxAbs, money(n) + '원');
+    }
+    view.append(tc);
+  }
+
+  const f = card();
+  f.append(collapsed('＋ 수입 · 지출 기록', form(
+    INCOME_FIELDS.map(x => x.key === 'date' ? { ...x, value: today() } : x),
+    b => { b.kind = b.kind || 'income'; b.date = b.date || today(); return save('income', b, '기록했어'); }
+  ), !d.income.length));
+  view.append(f);
+
+  if (d.income.length) {
+    const lc = card('기록');
+    d.income.slice(0, 40).forEach(r => {
+      const it = el('div', 'item');
+      const g = el('div', 'grow');
+      g.append(el('div', 't', r.source));
+      g.append(el('div', 'm', [r.date, r.note].filter(Boolean).join(' · ')));
+      it.append(g);
+      const amt = el('div', null, (r.kind === 'expense' ? '−' : '+') + money(r.amount));
+      amt.style.cssText = `font-weight:700;font-variant-numeric:tabular-nums;color:${r.kind === 'expense' ? 'var(--urgent)' : 'var(--done)'}`;
+      it.append(amt);
+      const del = el('button', 'mini danger', '×');
+      del.onclick = () => remove('income', r.id, r.source);
+      it.append(del);
+      lc.append(it);
+    });
+    view.append(lc);
+  }
+}
+
+/* ---------- 📜 기록함 ---------- */
+
+/* 흩어진 15개 테이블을 한 줄기로 모은다.
+   "그거 어디 적었더라" 를 해결하는 게 목적이라, 날짜와 검색만 있으면 된다. */
+function allRecords(d) {
+  const out = [];
+  const push = (date, kind, emo, title, sub, tab) => {
+    if (!date || !title) return;
+    out.push({ date: String(date).slice(0, 10), kind, emo, title: String(title), sub: sub || '', tab });
+  };
+
+  d.notes.forEach(n => push(n.created_at, '노트', '📝', n.title,
+    [n.source_label, n.applied ? '적용함' : null, n.action].filter(Boolean).join(' · '), 'notes'));
+  d.blockers.forEach(b => push(b.created_at, '막힌 것', '🧩', b.title,
+    [CAT_LABEL[b.category], b.status === 'solved' ? '해결: ' + (b.solution || '') : '미해결'].filter(Boolean).join(' · '), 'blockers'));
+  d.people.forEach(p => push(p.met_at || p.created_at, '사람', '🤝', p.name,
+    [p.met_where, p.learned].filter(Boolean).join(' · '), 'people'));
+  d.ideas.forEach(i => push(i.created_at, '아이디어', '💡', i.title,
+    [IDEA_LABEL[i.status], i.detail].filter(Boolean).join(' · '), 'ideas'));
+  d.mastery.forEach(m => push(m.created_at, '숙달', '🧠', m.term,
+    [MCAT_LABEL[m.category], LEVELS[m.level || 0].name, m.meaning].filter(Boolean).join(' · '), 'mastery'));
+  d.selfcheck.forEach(s => push(s.date, '메타인지', '🪞', s.area,
+    [s.self_score != null ? `나 ${s.self_score} / 선임 ${s.other_score}` : null, s.evidence].filter(Boolean).join(' · '), 'selfcheck'));
+  d.books.forEach(b => push(b.finished_at || b.created_at, '독서', '📖', b.title,
+    [b.author, b.status === 'finished' ? '완독' : null, b.notes].filter(Boolean).join(' · '), 'books'));
+  d.courses.forEach(c => push(c.created_at, '강의', '📚', c.name,
+    [c.platform, `${c.completed_lectures || 0}/${c.total_lectures}강`].filter(Boolean).join(' · '), 'courses'));
+  d.fitness.forEach(f => push(f.date, '운동', '💪', f.exercise_type || '운동 기록',
+    [f.weight ? f.weight + 'kg' : null, f.sets ? f.sets + '세트' : null, f.notes].filter(Boolean).join(' · '), 'fitness'));
+  d.mindpick.forEach(m => push(m.post_date, '마인드픽', '📱', m.content || '게시물',
+    `도달 ${num(m.reach)} · ❤️ ${num(m.likes)}`, 'mindpick'));
+  d.military.forEach(t => push(t.completed_at || t.created_at, '복무', '🪖', t.task,
+    [t.category, t.status === 'done' ? '완료' : '진행'].filter(Boolean).join(' · '), 'military'));
+  d.goals.forEach(g => push(g.created_at, '목표', '🎯', g.title,
+    `${trim(+g.current_value)}/${trim(+g.target_value)}${g.metric || ''} · ${goalStat(g).progress}%`, 'goals'));
+  d.steps.filter(s => s.done).forEach(s => {
+    const g = d.goals.find(x => String(x.id) === String(s.goal_id));
+    push(s.done_at, '과정', '🪜', s.title, g ? g.title : '', 'goals');
+  });
+  d.income.forEach(r => push(r.date, '수익', '💰', r.source,
+    `${r.kind === 'expense' ? '지출' : '수입'} ${money(r.amount)}원`, 'income'));
+  d.reviews.forEach(r => push(r.week_start, '회고', '📅', `${r.week_start} 주간 회고`,
+    r.focus ? '다음 주: ' + r.focus : '', 'review'));
+
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+let archQuery = '';
+let archKind = 'all';
+
+function viewArchive(view, d) {
+  const all = allRecords(d);
+  const kinds = [...new Set(all.map(r => r.kind))];
+
+  const head = card('기록함');
+  head.append(el('div', 'empty', `지금까지 남긴 기록 ${all.length}개. 여기서 다 찾을 수 있다.`));
+
+  const search = el('input');
+  search.type = 'search';
+  search.placeholder = '검색 — 단어 아무거나';
+  search.value = archQuery;
+  search.style.marginTop = '12px';
+  /* 입력 중에 다시 그리면 포커스가 날아간다. 목록만 갈아끼운다. */
+  search.oninput = () => { archQuery = search.value; paint(); };
+  head.append(search);
+
+  const seg = el('div', 'seg');
+  seg.style.marginTop = '12px';
+  [['all', `전체 ${all.length}`], ...kinds.map(k => [k, k])].forEach(([v, t]) => {
+    const b = el('button', archKind === v ? 'on' : '', t);
+    b.onclick = () => {
+      archKind = v;
+      [...seg.children].forEach(c => c.classList.remove('on'));
+      b.classList.add('on');
+      paint();
+    };
+    seg.append(b);
+  });
+  head.append(seg);
+  view.append(head);
+
+  const listCard = card();
+  view.append(listCard);
+
+  function paint() {
+    listCard.replaceChildren();
+    const q = archQuery.trim().toLowerCase();
+    const rows = all.filter(r =>
+      (archKind === 'all' || r.kind === archKind) &&
+      (!q || (r.title + ' ' + r.sub + ' ' + r.kind).toLowerCase().includes(q)));
+
+    if (!rows.length) {
+      listCard.append(el('div', 'empty', q ? `"${archQuery}" 로 찾은 게 없다.` : '아직 기록이 없다.'));
+      return;
+    }
+
+    let lastDay = null;
+    rows.slice(0, 200).forEach(r => {
+      if (r.date !== lastDay) {
+        lastDay = r.date;
+        const h = el('div', 'daysep', r.date);
+        listCard.append(h);
+      }
+      const it = el('div', 'item arch');
+      it.append(el('div', 'aemo', r.emo));
+      const g = el('div', 'grow');
+      const t = el('div', 't');
+      t.textContent = r.title;
+      t.style.whiteSpace = 'normal';
+      g.append(t);
+      if (r.sub) {
+        const s = el('div', 'm', r.sub);
+        s.style.whiteSpace = 'normal';
+        g.append(s);
+      }
+      it.append(g);
+      it.append(el('span', 'pill', r.kind));
+      it.style.cursor = 'pointer';
+      it.onclick = () => goTab(r.tab);
+      listCard.append(it);
+    });
+    if (rows.length > 200) listCard.append(el('div', 'empty', `외 ${rows.length - 200}개 — 검색으로 좁혀봐`));
+  }
+  paint();
+}
+
 /* ---------- 📅 주간 회고 ---------- */
 
 /* 이번 주 월요일 */
@@ -2167,6 +2446,7 @@ function viewReview(view, d) {
   if (st.unaided > 0) obs.push(`안 보고 나온 게 ${st.unaided}번. 숙달 쪽은 굴러가는 중.`);
   if (st.solved === 0 && d.blockers.some(b => b.status !== 'solved')) obs.push('막힌 것이 그대로 남아 있다. 한 주에 하나는 풀어야 쌓이지 않는다.');
   if (st.steps === 0 && active.length) obs.push('과정을 하나도 못 끝냈다. 단계가 너무 큰 건 아닌지 확인.');
+  if (!d.income.length) obs.push('수익 기록이 하나도 없다. 결과지표를 안 재면 지금 하는 게 맞는 방향인지 알 수 없다.');
   if (obs.length) {
     const oc = card('관찰');
     obs.forEach(o => {
@@ -3034,7 +3314,7 @@ function viewIdeas(view, d) {
 }
 
 const VIEWS = {
-  home: viewHome, goals: viewGoals, review: viewReview, mastery: viewMastery, selfcheck: viewSelfcheck,
+  home: viewHome, goals: viewGoals, income: viewIncome, archive: viewArchive, review: viewReview, mastery: viewMastery, selfcheck: viewSelfcheck,
   notes: viewNotes, blockers: viewBlockers, people: viewPeople, ideas: viewIdeas,
   courses: viewCourses, fitness: viewFitness, books: viewBooks, mindpick: viewMindpick, military: viewMilitary
 };

@@ -36,7 +36,9 @@ const RESOURCES = {
   steps:     { table: 'me_steps',         orderBy: 'order_index',
                fields: ['goal_id', 'title', 'order_index', 'done', 'done_at', 'target_date', 'note', 'when_cue'] },
   reviews:   { table: 'me_reviews',       orderBy: 'week_start',
-               fields: ['week_start', 'went_well', 'went_bad', 'focus', 'snapshot'] }
+               fields: ['week_start', 'went_well', 'went_bad', 'focus', 'snapshot'] },
+  income:    { table: 'me_income',        orderBy: 'date',
+               fields: ['date', 'kind', 'source', 'amount', 'note'] }
 };
 
 const HANDLERS = Object.fromEntries(
@@ -44,7 +46,7 @@ const HANDLERS = Object.fromEntries(
 );
 
 /* me_settings 는 기본키가 key 라 id 기준 crudHandler 를 쓸 수 없다. */
-const SETTING_KEYS = new Set(['service_start', 'service_end']);
+const SETTING_KEYS = new Set(['service_start', 'service_end', 'income_target']);
 
 async function settingsHandler(req, res) {
   if (req.method === 'GET') {
