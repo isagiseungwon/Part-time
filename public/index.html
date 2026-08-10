@@ -11,14 +11,15 @@
      세 색은 all-pairs 색맹 분리 ΔE 9.4 / 일반 20.9 로 통과한다. */
   :root {
     color-scheme: dark;
-    --page:      #0d0d12;
-    --card:      #16161d;
-    --raised:    #1e1e28;
-    --line:      #272733;
-    --track:     #313142;  /* 진행 트랙. 카드 위에서 확실히 보여야 링이 링으로 읽힌다 */
-    --text:      #f4f4f8;
-    --muted:     #9c9cab;
-    --faint:     #6b6b7a;
+    /* 완전한 검정은 눈이 피로하다. 살짝 띄운 남색 계열로. */
+    --page:      #0f1017;
+    --card:      #191b25;
+    --raised:    #21242f;
+    --line:      #2c3040;
+    --track:     #363b4d;  /* 진행 트랙. 카드 위에서 확실히 보여야 링이 링으로 읽힌다 */
+    --text:      #edeff5;
+    --muted:     #a2a7b8;
+    --faint:     #737a8c;
 
     --accent:    #3987e5;  /* 진행 */
     --streak:    #d95926;  /* 연속 */
@@ -31,7 +32,16 @@
     --heat-3:    #3987e5;
     --heat-4:    #86b6ef;
 
-    --r:         16px;
+    --r:         20px;
+    /* 입체감은 그림자 한 겹으로 안 난다. 안쪽 하이라이트 + 바깥 그림자 두 겹. */
+    --lift:
+      0 1px 0 rgba(255,255,255,.06) inset,
+      0 1px 2px rgba(0,0,0,.5),
+      0 14px 34px -20px rgba(0,0,0,1);
+    --lift-hi:
+      0 1px 0 rgba(255,255,255,.10) inset,
+      0 2px 6px rgba(0,0,0,.55),
+      0 22px 48px -22px rgba(0,0,0,1);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -42,8 +52,8 @@
     color: var(--text);
     font-family: system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", Roboto, sans-serif;
     font-size: 15px;
-    line-height: 1.5;
-    padding-bottom: 96px;
+    line-height: 1.62;
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
     overscroll-behavior-y: contain;
   }
 
@@ -75,7 +85,7 @@
     backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--line);
   }
-  .bar { display: flex; align-items: center; gap: 10px; padding: 13px 16px 0; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 14px 16px; }
   .bar h1 {
     margin: 0; font-size: 1rem; font-weight: 750; letter-spacing: -.02em;
     background: linear-gradient(92deg, #fff 10%, #9ec5f4 60%, #86b6ef);
@@ -100,23 +110,53 @@
     50%      { box-shadow: 0 0 22px -2px color-mix(in srgb, var(--streak) 85%, transparent); }
   }
 
-  nav {
-    display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px;
-    /* 오른쪽 페이드로 더 스크롤된다는 걸 알린다 */
-    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
-            mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
-  }
-  nav::-webkit-scrollbar { display: none; }
-  nav button {
-    flex: 0 0 auto; cursor: pointer; font-family: inherit;
-    background: var(--card); color: var(--muted);
-    border: 1px solid var(--line); border-radius: 999px;
-    padding: 7px 13px; font-size: .82rem;
-    transition: background .15s, color .15s;
-  }
-  nav button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  /* ---------- 아래 탭바 ---------- */
 
-  main { padding: 16px; display: grid; gap: 12px; }
+  .tabbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    gap: 2px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+    background: color-mix(in srgb, var(--card) 78%, transparent);
+    backdrop-filter: blur(22px) saturate(1.5);
+    -webkit-backdrop-filter: blur(22px) saturate(1.5);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -12px 34px -22px #000;
+  }
+  .tabbar button {
+    position: relative; cursor: pointer; font-family: inherit;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: 0; padding: 8px 2px 6px; border-radius: 14px;
+    color: var(--faint); font-size: .66rem; font-weight: 600;
+    transition: color .18s, transform .18s;
+  }
+  .tabbar button .ti { font-size: 1.22rem; line-height: 1; transition: transform .22s cubic-bezier(.2,1.5,.4,1); }
+  .tabbar button.on { color: var(--accent); }
+  .tabbar button.on .ti { transform: translateY(-2px) scale(1.14); }
+  .tabbar button.on::before {
+    content: '';
+    position: absolute; inset: 2px 6px;
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 26%, transparent) inset;
+  }
+  .tabbar button > * { position: relative; }
+  .tabbar button:active { transform: scale(.94); }
+
+  /* 더보기 안의 아이콘 격자 */
+  .moregrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 6px; }
+  .moreitem {
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    padding: 16px 8px; border-radius: 16px; cursor: pointer; font-family: inherit;
+    background: var(--raised); border: 1px solid var(--line);
+    color: var(--text); font-size: .76rem; font-weight: 600;
+    box-shadow: var(--lift);
+    transition: transform .16s;
+  }
+  .moreitem .me { font-size: 1.5rem; line-height: 1; }
+  .moreitem:active { transform: scale(.95); }
+  .moreitem.on { border-color: color-mix(in srgb, var(--accent) 50%, transparent); color: var(--accent); }
+
+  main { padding: 18px 16px; display: grid; gap: 14px; }
 
   /* ---------- 카드 ---------- */
 
@@ -127,8 +167,8 @@
       var(--card);
     border: 1px solid var(--line);
     border-radius: var(--r);
-    padding: 16px;
-    box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 12px 28px -18px rgba(0,0,0,.9);
+    padding: 20px 18px;
+    box-shadow: var(--lift);
   }
   /* 카드 윗변에 가느다란 빛줄기 */
   .card::before {
@@ -206,13 +246,14 @@
   /* ---------- 퀘스트 ---------- */
 
   .quest {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; gap: 13px;
     background: var(--raised);
     border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 12px 13px;
-    margin-bottom: 8px;
+    border-radius: 15px;
+    padding: 15px 14px;
+    margin-bottom: 10px;
     cursor: pointer;
+    box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 8px 18px -16px #000;
     transition: transform .12s, border-color .15s;
   }
   .quest:last-child { margin-bottom: 0; }
@@ -376,7 +417,8 @@
 
   .entry {
     background: var(--raised); border: 1px solid var(--line);
-    border-radius: 13px; padding: 13px 14px; margin-bottom: 9px;
+    border-radius: 16px; padding: 16px; margin-bottom: 11px;
+    box-shadow: 0 1px 0 rgba(255,255,255,.04) inset, 0 8px 20px -16px #000;
   }
   .entry:last-child { margin-bottom: 0; }
   .entry .eh { display: flex; align-items: flex-start; gap: 9px; }
@@ -485,34 +527,38 @@
 
 <header>
   <div class="bar">
-    <h1>강승원 · 성장 기록</h1>
+    <h1 id="title">강승원 · 성장 기록</h1>
     <div class="spacer"></div>
     <div class="streakchip" id="streakchip">🔥 0일</div>
   </div>
-  <nav id="tabs"></nav>
 </header>
 
 <main id="view"></main>
+<nav class="tabbar" id="tabs"></nav>
 <div id="toast"></div>
 
 <script>
 /* ============ 설정 ============ */
 
 const TABS = [
-  { id: 'home',      label: '홈' },
-  { id: 'goals',     label: '🎯 목표' },
-  { id: 'mastery',   label: '🧠 숙달' },
-  { id: 'selfcheck', label: '🪞 메타인지' },
-  { id: 'notes',    label: '📝 노트' },
-  { id: 'blockers', label: '🧩 막힌 것' },
-  { id: 'people',   label: '🤝 사람' },
-  { id: 'ideas',    label: '💡 아이디어' },
-  { id: 'books',    label: '📖 독서' },
-  { id: 'courses',  label: '📚 강의' },
-  { id: 'fitness',  label: '💪 운동' },
-  { id: 'mindpick', label: '📱 마인드픽' },
-  { id: 'military', label: '🪖 전역' }
+  { id: 'home',      emo: '🏠', name: '홈' },
+  { id: 'goals',     emo: '🎯', name: '목표' },
+  { id: 'mastery',   emo: '🧠', name: '숙달' },
+  { id: 'notes',     emo: '📝', name: '노트' },
+  { id: 'selfcheck', emo: '🪞', name: '메타인지' },
+  { id: 'blockers',  emo: '🧩', name: '막힌 것' },
+  { id: 'people',    emo: '🤝', name: '사람' },
+  { id: 'ideas',     emo: '💡', name: '아이디어' },
+  { id: 'books',     emo: '📖', name: '독서' },
+  { id: 'courses',   emo: '📚', name: '강의' },
+  { id: 'fitness',   emo: '💪', name: '운동' },
+  { id: 'mindpick',  emo: '📱', name: '마인드픽' },
+  { id: 'military',  emo: '🪖', name: '전역' }
 ];
+
+/* 아래 탭바에 두는 넷. 나머지는 "더보기" 안으로. 엄지가 닿는 자리는 좁다. */
+const PRIMARY = ['home', 'goals', 'mastery', 'notes'];
+const TAB = Object.fromEntries(TABS.map(t => [t.id, t]));
 
 /* 행동 하나당 경험치. 어려운 일일수록 크게. */
 const XP = {
@@ -1019,10 +1065,45 @@ function collapsed(title, node, open) {
 
 function goTab(id) {
   current = id;
-  const nav = document.getElementById('tabs');
-  [...nav.children].forEach((n, i) => n.classList.toggle('on', TABS[i].id === current));
+  document.getElementById('title').textContent =
+    current === 'home' ? '강승원 · 성장 기록' : `${TAB[current].emo} ${TAB[current].name}`;
+  paintTabs();
   window.scrollTo({ top: 0 });
   render();
+}
+
+function paintTabs() {
+  const nav = document.getElementById('tabs');
+  [...nav.children].forEach((n) => {
+    const id = n.dataset.tab;
+    n.classList.toggle('on', id === 'more' ? !PRIMARY.includes(current) : id === current);
+  });
+}
+
+/* 나머지 탭은 격자 시트로. 위에 늘어놓으면 엄지도 안 닿고 뭐가 있는지도 모른다. */
+function openMore() {
+  const back = el('div', 'sheetback');
+  const sheet = el('div', 'sheet');
+  const head = el('div', 'sheethead');
+  head.append(el('h3', null, '전체'));
+  const x = el('button', 'mini', '닫기');
+  x.onclick = () => back.remove();
+  head.append(x);
+  sheet.append(head);
+
+  const grid = el('div', 'moregrid');
+  TABS.filter(t => !PRIMARY.includes(t.id)).forEach(t => {
+    const b = el('button', 'moreitem' + (t.id === current ? ' on' : ''));
+    b.append(el('div', 'me', t.emo), el('div', null, t.name));
+    b.onclick = () => { back.remove(); goTab(t.id); };
+    grid.append(b);
+  });
+  sheet.append(grid);
+
+  back.append(sheet);
+  back.onclick = (e) => { if (e.target === back) back.remove(); };
+  document.body.append(back);
+  requestAnimationFrame(() => back.classList.add('open'));
 }
 
 /* ============ 홈 ============ */
@@ -1062,10 +1143,11 @@ function viewHome(view, d) {
   const active = d.goals.filter(g => g.status === 'active');
   if (active.length) {
     const gc = card('목표');
-    active.slice(0, 4).forEach(g => gc.append(goalBlock(g, d, true)));
-    if (active.length > 4) gc.append(el('div', 'empty', `외 ${active.length - 4}개`));
-    const more = el('button', 'mini', '전체 보기');
-    more.style.marginTop = '10px';
+    /* 홈은 훑는 화면이다. 기한 급한 둘만 보이고 나머지는 탭에서. */
+    const soon = [...active].sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999'));
+    soon.slice(0, 2).forEach(g => gc.append(goalBlock(g, d, true)));
+    const more = el('button', 'mini', active.length > 2 ? `전체 ${active.length}개 보기` : '목표 탭 열기');
+    more.style.marginTop = '4px';
     more.onclick = () => goTab('goals');
     gc.append(more);
     view.append(gc);
@@ -1080,8 +1162,12 @@ function viewHome(view, d) {
 
   /* 오늘의 퀘스트 */
   const qc = card('오늘의 퀘스트');
-  const qs = quests(d);
-  if (!qs.length) qc.append(el('div', 'empty', '탭에서 항목을 먼저 등록해줘.'));
+  const all = quests(d);
+  if (!all.length) qc.append(el('div', 'empty', '탭에서 항목을 먼저 등록해줘.'));
+  /* 안 끝난 것 먼저, 화면엔 다섯 개까지. 열 개 늘어놓으면 하나도 안 한다. */
+  const ordered = [...all.filter(q => !q.done), ...all.filter(q => q.done)];
+  const LIMIT = 5;
+  const qs = questsOpen ? ordered : ordered.slice(0, LIMIT);
   qs.forEach(q => {
     const n = el('div', 'quest' + (q.done ? ' cleared' : ''));
     n.append(el('div', 'ico', q.emo));
@@ -1093,6 +1179,12 @@ function viewHome(view, d) {
     if (!q.done) n.onclick = q.act;
     qc.append(n);
   });
+  if (ordered.length > LIMIT) {
+    const t = el('button', 'mini', questsOpen ? '접기' : `＋ ${ordered.length - LIMIT}개 더`);
+    t.style.marginTop = '4px';
+    t.onclick = () => { questsOpen = !questsOpen; render(); };
+    qc.append(t);
+  }
   view.append(qc);
 
   /* 오늘 들고 나갈 한 가지 — 폰 없는 일과 중을 위한 장치 */
@@ -1937,6 +2029,7 @@ function gradeCard(card, ok, unaided) {
 
 let reviewQueue = null;   // 복습 중인 카드 배열
 let reviewShown = false;  // 답을 열었는가
+let questsOpen = false;   // 홈 퀘스트를 다 펼쳤는가
 
 function viewMastery(view, d) {
   const rows = d.mastery;
@@ -2545,11 +2638,20 @@ async function render() {
 
 (function boot() {
   const nav = document.getElementById('tabs');
-  TABS.forEach(t => {
-    const b = el('button', t.id === current ? 'on' : '', t.label);
-    b.onclick = () => goTab(t.id);
+  PRIMARY.forEach(id => {
+    const t = TAB[id];
+    const b = el('button', id === current ? 'on' : '');
+    b.dataset.tab = id;
+    b.append(el('span', 'ti', t.emo), el('span', null, t.name));
+    b.onclick = () => goTab(id);
     nav.append(b);
   });
+  const more = el('button');
+  more.dataset.tab = 'more';
+  more.append(el('span', 'ti', '☰'), el('span', null, '더보기'));
+  more.onclick = openMore;
+  nav.append(more);
+
   render();
 })();
 </script>
