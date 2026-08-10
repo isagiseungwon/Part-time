@@ -29,7 +29,12 @@ const RESOURCES = {
   drills:    { table: 'me_drills',        orderBy: 'date',
                fields: ['date', 'mastery_id', 'term_snapshot', 'recalled', 'unaided', 'note'] },
   selfcheck: { table: 'me_selfcheck',     orderBy: 'date',
-               fields: ['date', 'area', 'self_score', 'other_score', 'evidence', 'gap_note', 'action'] }
+               fields: ['date', 'area', 'self_score', 'other_score', 'evidence', 'gap_note', 'action'] },
+  goals:     { table: 'me_goals',         orderBy: 'created_at',
+               fields: ['title', 'category', 'metric', 'start_value', 'current_value', 'target_value',
+                        'direction', 'deadline', 'why', 'status', 'updated_at'] },
+  steps:     { table: 'me_steps',         orderBy: 'order_index',
+               fields: ['goal_id', 'title', 'order_index', 'done', 'done_at', 'target_date', 'note'] }
 };
 
 const HANDLERS = Object.fromEntries(

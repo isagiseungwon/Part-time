@@ -393,6 +393,56 @@
   .field.sol { border-left: 2px solid var(--done); padding-left: 9px; }
   .entry .acts { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
 
+  /* ---------- 목표 ---------- */
+
+  .goal { background:
+      linear-gradient(170deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 42%),
+      var(--raised); }
+
+  .goalnums { display: flex; align-items: baseline; gap: 6px; margin: 14px 0 7px; }
+  .goalnums .gnow { font-size: 1.5rem; font-weight: 750; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .goalnums .gtgt { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .goalnums .gspacer { flex: 1; }
+  .goalnums .gpct {
+    font-size: .95rem; font-weight: 750; color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .gtrack { position: relative; height: 10px; border-radius: 5px; }
+  .gtrack .fill {
+    background: linear-gradient(90deg, var(--accent), #8fc7ff);
+    box-shadow: 0 0 12px -2px color-mix(in srgb, var(--accent) 75%, transparent);
+    transition: width .9s cubic-bezier(.2,.8,.3,1);
+  }
+  .gtrack .fill.full { background: linear-gradient(90deg, var(--done), #3fd39a); }
+  /* 지금쯤 와 있어야 할 지점 */
+  .expmark {
+    position: absolute; top: -3px; bottom: -3px; width: 2px;
+    background: var(--text); opacity: .55; border-radius: 1px;
+  }
+
+  .need {
+    margin-top: 9px; font-size: .8rem; font-weight: 600;
+    color: var(--accent); font-variant-numeric: tabular-nums;
+  }
+  .need.done { color: var(--done); }
+
+  .steps { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .stephead { font-size: .7rem; color: var(--faint); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 8px; }
+  .steprow { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: .86rem; }
+  .steprow .t { line-height: 1.35; }
+  .steprow .m { font-size: .72rem; color: var(--faint); }
+  .steprow.done .t { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--faint); }
+  .chk {
+    flex: 0 0 auto; width: 22px; height: 22px; border-radius: 7px; cursor: pointer;
+    background: var(--card); border: 1.5px solid var(--line); color: #fff;
+    font-size: .78rem; font-weight: 800; line-height: 1; font-family: inherit;
+  }
+  .chk.on {
+    background: var(--done); border-color: var(--done);
+    box-shadow: 0 0 12px -3px color-mix(in srgb, var(--done) 80%, transparent);
+  }
+
   .pill {
     display: inline-flex; align-items: center; gap: 4px;
     font-size: .68rem; font-weight: 650; padding: 3px 9px; border-radius: 999px;
@@ -450,6 +500,7 @@
 
 const TABS = [
   { id: 'home',      label: '홈' },
+  { id: 'goals',     label: '🎯 목표' },
   { id: 'mastery',   label: '🧠 숙달' },
   { id: 'selfcheck', label: '🪞 메타인지' },
   { id: 'notes',    label: '📝 노트' },
@@ -467,8 +518,18 @@ const TABS = [
 const XP = {
   lecture: 10, workout: 20, page: 0.5, post: 30, task: 25, book: 60,
   note: 15, applied: 25, solved: 40, person: 15, idea: 5, shipped: 50,
-  card: 5, review: 3, unaided: 20, check: 20
+  card: 5, review: 3, unaided: 20, check: 20,
+  step: 30, goalDone: 200
 };
+
+const GOAL_CATS = [
+  ['content', '콘텐츠'],
+  ['skill',   '실력'],
+  ['body',    '몸'],
+  ['army',    '군생활'],
+  ['other',   '기타']
+];
+const GCAT_LABEL = Object.fromEntries(GOAL_CATS);
 
 /* 숙달 3단계. 안다 → 쓴다 → 왜인지 안다. */
 const LEVELS = [
@@ -510,7 +571,10 @@ const ACHIEVEMENTS = [
   { id: 'master1',  emo: '⭐', name: '첫 궁구',      test: d => d.mastery.some(m => m.level >= 3) },
   { id: 'master10', emo: '🎯', name: '구사 10개',    test: d => d.mastery.filter(m => m.level >= 2).length >= 10 },
   { id: 'unaided',  emo: '🌀', name: '무의식 10회',  test: d => d.mastery.reduce((s, m) => s + (m.unaided_count || 0), 0) >= 10 },
-  { id: 'mirror',   emo: '🪞', name: '메타인지 10회', test: d => d.selfcheck.length >= 10 }
+  { id: 'mirror',   emo: '🪞', name: '메타인지 10회', test: d => d.selfcheck.length >= 10 },
+  { id: 'goal1',    emo: '🎯', name: '목표 달성',    test: d => d.goals.some(g => g.status === 'done') },
+  { id: 'goal3',    emo: '🏹', name: '목표 3개 달성', test: d => d.goals.filter(g => g.status === 'done').length >= 3 },
+  { id: 'step25',   emo: '🪜', name: '과정 25개',    test: d => d.steps.filter(s => s.done).length >= 25 }
 ];
 
 const BLOCKER_CATS = [
@@ -566,6 +630,8 @@ function total(d) {
   for (const i of d.ideas)     xp += XP.idea + (i.status === 'shipped' ? XP.shipped : 0);
   for (const m of d.mastery)   xp += XP.card + (m.reps || 0) * XP.review + (m.unaided_count || 0) * XP.unaided;
   for (const s of d.selfcheck) xp += XP.check;
+  for (const s of d.steps)     if (s.done) xp += XP.step;
+  for (const g of d.goals)     if (g.status === 'done') xp += XP.goalDone;
   return Math.round(xp);
 }
 
@@ -597,6 +663,8 @@ function activityMap(d) {
   d.mastery.forEach(r => add(r.last_review));
   d.drills.forEach(r => add(r.date));
   d.selfcheck.forEach(r => add(r.date));
+  d.steps.forEach(r => add(r.done_at));
+  d.goals.forEach(r => add(r.updated_at));
   return m;
 }
 
@@ -614,7 +682,7 @@ function streakOf(d) {
 /* ============ API ============ */
 
 const ENDPOINTS = ['courses', 'fitness', 'books', 'mindpick', 'military', 'notes', 'blockers',
-                   'people', 'ideas', 'mastery', 'drills', 'selfcheck'];
+                   'people', 'ideas', 'mastery', 'drills', 'selfcheck', 'goals', 'steps'];
 let DATA = null;
 let current = 'home';
 
@@ -640,6 +708,62 @@ async function loadAll(force) {
   DATA.settings = settings || {};
   return DATA;
 }
+
+/* 목표 하나의 진행률과 페이스.
+   "얼마나 왔나" 만으론 부족하다. 기한까지 남은 시간과 견줘서
+   "하루에 얼마씩 해야 하나" 까지 나와야 오늘 할 일로 바뀐다. */
+function goalStat(g) {
+  const start = +g.start_value || 0;
+  const cur = +g.current_value || 0;
+  const tgt = +g.target_value || 0;
+  const down = g.direction === 'down';
+
+  const span = down ? (start - tgt) : (tgt - start);
+  const gone = down ? (start - cur) : (cur - start);
+  const progress = span > 0 ? Math.max(0, Math.min(100, Math.round((gone / span) * 100))) : 0;
+  const remain = Math.max(0, down ? (cur - tgt) : (tgt - cur));
+
+  let daysLeft = null, expected = null, perDay = null, pace = null;
+  if (g.deadline) {
+    const end = new Date(g.deadline + 'T00:00:00');
+    const now = new Date(today() + 'T00:00:00');
+    daysLeft = Math.ceil((end - now) / 86400000);
+
+    if (daysLeft > 0) {
+      perDay = remain / daysLeft;
+      const startedAt = new Date((g.created_at || today()).slice(0, 10) + 'T00:00:00');
+      const totalDays = Math.max(1, Math.ceil((end - startedAt) / 86400000));
+      const elapsed = Math.max(0, Math.ceil((now - startedAt) / 86400000));
+      expected = Math.min(100, Math.round((elapsed / totalDays) * 100));
+      pace = progress >= expected ? 'ahead' : (expected - progress >= 15 ? 'behind' : 'ontrack');
+    } else {
+      pace = progress >= 100 ? 'ahead' : 'over';
+    }
+  }
+  return { progress, remain, daysLeft, expected, perDay, pace, down, metric: g.metric || '개' };
+}
+
+/* 소수점은 필요할 때만 */
+const trim = (n) => {
+  const r = Math.round(n * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
+};
+
+/* 하루치가 너무 작으면 "하루 0kg" 처럼 쓸모없는 문장이 된다.
+   1 이상이 되는 단위(하루/주/달)로 올려서 말한다. */
+function perText(perDay, metric) {
+  const m = metric || '';
+  if (perDay >= 1)      return `하루 ${trim(perDay)}${m}씩`;
+  if (perDay * 7 >= 1)  return `주 ${trim(perDay * 7)}${m}씩`;
+  return `한 달 ${trim(perDay * 30)}${m}씩`;
+}
+
+const PACE_TEXT = {
+  ahead:   ['앞서감', 'solved'],
+  ontrack: ['정상',   'trying'],
+  behind:  ['뒤처짐', 'open'],
+  over:    ['기한 지남', 'open']
+};
 
 /* 복무 진행 상황. 입대일·전역일이 없으면 null. */
 function service(d) {
@@ -934,6 +1058,26 @@ function viewHome(view, d) {
   hero.append(row);
   view.append(hero);
 
+  /* 목표 — 어디로 가는 중인가 */
+  const active = d.goals.filter(g => g.status === 'active');
+  if (active.length) {
+    const gc = card('목표');
+    active.slice(0, 4).forEach(g => gc.append(goalBlock(g, d, true)));
+    if (active.length > 4) gc.append(el('div', 'empty', `외 ${active.length - 4}개`));
+    const more = el('button', 'mini', '전체 보기');
+    more.style.marginTop = '10px';
+    more.onclick = () => goTab('goals');
+    gc.append(more);
+    view.append(gc);
+  } else {
+    const gc = card('목표');
+    gc.append(el('div', 'empty', '숫자로 끝나는 목표를 하나 넣으면, 여기에 진행률과 하루 필요량이 뜬다.'));
+    const b = el('button', 'submit', '목표 만들기');
+    b.onclick = () => goTab('goals');
+    gc.append(b);
+    view.append(gc);
+  }
+
   /* 오늘의 퀘스트 */
   const qc = card('오늘의 퀘스트');
   const qs = quests(d);
@@ -1127,6 +1271,22 @@ function quests(d) {
     sub: posted ? '오늘 올림' : '릴스든 카드뉴스든 하나',
     done: posted,
     act: () => goTab('mindpick')
+  });
+
+  /* 목표의 다음 과정이 최우선 퀘스트. 목표 없이 굴리는 하루가 제일 아깝다. */
+  d.goals.filter(g => g.status === 'active').forEach(g => {
+    const steps = d.steps.filter(x => String(x.goal_id) === String(g.id))
+      .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+    const next = steps.find(x => !x.done);
+    if (!next) return;
+    const s = goalStat(g);
+    out.push({
+      emo: '🎯', xp: XP.step,
+      title: next.title,
+      sub: `${g.title} · ${s.progress}%` + (s.perDay != null && s.remain > 0 ? ` · ${perText(s.perDay, g.metric)}` : ''),
+      done: false,
+      act: () => patch('steps', next.id, { done: true, done_at: new Date().toISOString() }, `+${XP.step} XP`)
+    });
   });
 
   const due = dueCards(d);
@@ -1540,6 +1700,211 @@ function viewMilitary(view, d) {
       h.append(it);
     });
     view.append(h);
+  }
+}
+
+/* ---------- 🎯 목표 ---------- */
+
+const GOAL_FIELDS = [
+  { key: 'title', required: true, label: '목표', placeholder: '예) 마인드픽 팔로워 3000명' },
+  { key: 'category', label: '분류', type: 'select', options: GOAL_CATS, half: true },
+  { key: 'metric', label: '단위', placeholder: '명 / 개 / 강 / kg', half: true },
+  { key: 'start_value', label: '시작 수치', type: 'number', half: true },
+  { key: 'target_value', label: '목표 수치', type: 'number', half: true },
+  { key: 'current_value', label: '현재 수치', type: 'number', half: true },
+  { key: 'direction', label: '방향', type: 'select', options: [['up', '올리기'], ['down', '줄이기 (체중 등)']], half: true },
+  { key: 'deadline', label: '기한', type: 'date' },
+  { key: 'why', label: '왜 이 목표인가', type: 'textarea' }
+];
+
+/* 목표 하나를 카드로. compact 면 홈용 요약. */
+function goalBlock(g, d, compact) {
+  const s = goalStat(g);
+  const steps = d.steps.filter(x => String(x.goal_id) === String(g.id))
+    .sort((a, b) => (a.order_index || 0) - (b.order_index || 0));
+  const doneSteps = steps.filter(x => x.done).length;
+  const nextStep = steps.find(x => !x.done);
+
+  const e = el('div', 'entry goal');
+  const h = el('div', 'eh');
+  h.append(el('div', 'et', g.title));
+  if (s.pace) {
+    const [txt, cls] = PACE_TEXT[s.pace];
+    h.append(el('span', 'pill ' + cls, txt));
+  }
+  e.append(h);
+
+  const meta = [
+    GCAT_LABEL[g.category] || g.category,
+    s.daysLeft != null ? (s.daysLeft > 0 ? `D-${s.daysLeft}` : '기한 지남') : '기한 없음'
+  ].filter(Boolean).join(' · ');
+  e.append(el('div', 'src', meta));
+
+  /* 큰 진행 막대 */
+  const nums = el('div', 'goalnums');
+  const now = el('span', 'gnow');
+  now.textContent = `${trim(+g.current_value || 0)}${g.metric || ''}`;
+  const tgt = el('span', 'gtgt');
+  tgt.textContent = `/ ${trim(+g.target_value || 0)}${g.metric || ''}`;
+  const pctTag = el('span', 'gpct');
+  pctTag.textContent = s.progress + '%';
+  nums.append(now, tgt, el('span', 'gspacer'), pctTag);
+  e.append(nums);
+
+  const track = el('div', 'track gtrack');
+  const fill = el('div', 'fill');
+  fill.style.width = '0%';
+  requestAnimationFrame(() => { fill.style.width = s.progress + '%'; });
+  if (s.progress >= 100) fill.classList.add('full');
+  track.append(fill);
+  /* 지금쯤 와 있어야 하는 지점 */
+  if (s.expected != null && s.expected < 100) {
+    const mark = el('div', 'expmark');
+    mark.style.left = s.expected + '%';
+    mark.title = `지금쯤 ${s.expected}%`;
+    track.append(mark);
+  }
+  e.append(track);
+
+  /* 필요 속도 — 정량 목표를 오늘 할 일로 바꾸는 줄 */
+  if (s.perDay != null && s.remain > 0) {
+    const need = el('div', 'need');
+    need.textContent = `남은 ${trim(s.remain)}${g.metric || ''} · ${s.daysLeft}일 → ${perText(s.perDay, g.metric)}`;
+    e.append(need);
+  } else if (s.progress >= 100) {
+    const need = el('div', 'need done');
+    need.textContent = '목표 달성 🎉';
+    e.append(need);
+  }
+
+  if (compact) {
+    if (nextStep) e.append(el('div', 'src', '다음 · ' + nextStep.title));
+    return e;
+  }
+
+  /* 빠른 기록 */
+  const quick = el('div', 'acts');
+  const bump = (n) => {
+    const b = el('button', 'mini' + (n > 0 ? ' go' : ''), (n > 0 ? '+' : '') + n);
+    b.onclick = () => patch('goals', g.id, {
+      current_value: (+g.current_value || 0) + n,
+      updated_at: new Date().toISOString()
+    });
+    return b;
+  };
+  quick.append(bump(1), bump(5), bump(-1));
+  const setv = el('button', 'mini', '직접 입력');
+  setv.onclick = () => {
+    const v = prompt(`"${g.title}" 현재 수치`, g.current_value);
+    if (v !== null && v.trim() !== '') patch('goals', g.id, { current_value: v.trim(), updated_at: new Date().toISOString() });
+  };
+  quick.append(setv);
+  e.append(quick);
+
+  /* 과정 */
+  const stepWrap = el('div', 'steps');
+  const shead = el('div', 'stephead');
+  shead.append(el('span', null, `과정 ${doneSteps}/${steps.length}`));
+  stepWrap.append(shead);
+
+  if (!steps.length) {
+    stepWrap.append(el('div', 'empty', '과정을 쪼개 넣으면 홈 퀘스트에 하나씩 올라온다.'));
+  }
+  steps.forEach(st => {
+    const row = el('div', 'steprow' + (st.done ? ' done' : ''));
+    const box = el('button', 'chk' + (st.done ? ' on' : ''), st.done ? '✓' : '');
+    box.onclick = () => patch('steps', st.id, {
+      done: !st.done,
+      done_at: st.done ? '' : new Date().toISOString()
+    }, st.done ? '되돌림' : `+${XP.step} XP`);
+    const t = el('div', 'grow');
+    t.append(el('div', 't', st.title));
+    if (st.target_date) t.append(el('div', 'm', st.target_date));
+    const del = el('button', 'mini danger', '×');
+    del.onclick = () => remove('steps', st.id, st.title);
+    row.append(box, t, del);
+    stepWrap.append(row);
+  });
+
+  const addStep = el('button', 'mini', '＋ 과정 추가');
+  addStep.onclick = () => {
+    const v = prompt('과정 하나 (작게 쪼갤수록 좋다)');
+    if (v && v.trim()) save('steps', { goal_id: g.id, title: v.trim(), order_index: steps.length }, '과정 추가');
+  };
+  stepWrap.append(addStep);
+  e.append(stepWrap);
+
+  const acts = el('div', 'acts');
+  if (g.status === 'active' && s.progress >= 100) {
+    const fin = el('button', 'mini ok', `달성 처리 (+${XP.goalDone}XP)`);
+    fin.onclick = () => patch('goals', g.id, { status: 'done' }, `+${XP.goalDone} XP 🎉`);
+    acts.append(fin);
+  }
+  const del = el('button', 'mini danger', '삭제');
+  del.onclick = () => remove('goals', g.id, g.title);
+  acts.append(editBtn('목표 수정', GOAL_FIELDS, g, 'goals'), del);
+  e.append(acts);
+  return e;
+}
+
+function viewGoals(view, d) {
+  const active = d.goals.filter(g => g.status === 'active');
+  const done = d.goals.filter(g => g.status === 'done');
+
+  const head = card('목표');
+  if (active.length) {
+    const avg = Math.round(active.reduce((s, g) => s + goalStat(g).progress, 0) / active.length);
+    const behind = active.filter(g => goalStat(g).pace === 'behind').length;
+    const g2 = el('div', 'rings');
+    const tile = (emo, v, label) => {
+      const c = el('div', 'ringcell');
+      const n = el('div', null, v);
+      n.style.cssText = 'font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums';
+      c.append(el('div', null, emo), n, el('div', 'lab', label));
+      return c;
+    };
+    g2.append(tile('🎯', String(active.length), '진행 중'), tile('📊', avg + '%', '평균 진행'), tile('⚠️', String(behind), '뒤처짐'));
+    head.append(g2);
+  } else {
+    head.append(el('div', 'empty',
+      '숫자로 끝나는 목표를 넣어. "영상 잘하기"는 목표가 아니다. "릴스 30개 올리기"가 목표다.'));
+  }
+  view.append(head);
+
+  const f = card();
+  f.append(collapsed('＋ 목표 추가', form(GOAL_FIELDS, b => {
+    b.category = b.category || 'other';
+    b.direction = b.direction || 'up';
+    b.metric = b.metric || '개';
+    if (b.start_value == null) b.start_value = b.current_value || 0;
+    return save('goals', b, '목표 등록');
+  }), !d.goals.length));
+  view.append(f);
+
+  if (active.length) {
+    const c = card('진행 중');
+    active.forEach(g => c.append(goalBlock(g, d, false)));
+    view.append(c);
+  }
+  if (done.length) {
+    const c = card(`달성 ${done.length}`);
+    done.forEach(g => {
+      const e = el('div', 'entry');
+      const h = el('div', 'eh');
+      h.append(el('div', 'et', g.title));
+      h.append(el('span', 'pill solved', '달성'));
+      e.append(h);
+      e.append(el('div', 'src', `${trim(+g.target_value)}${g.metric || ''} 도달`));
+      const acts = el('div', 'acts');
+      const re = el('button', 'mini', '다시 열기');
+      re.onclick = () => patch('goals', g.id, { status: 'active' });
+      const del = el('button', 'mini danger', '삭제');
+      del.onclick = () => remove('goals', g.id, g.title);
+      acts.append(re, del);
+      e.append(acts);
+      c.append(e);
+    });
+    view.append(c);
   }
 }
 
@@ -2144,7 +2509,7 @@ function viewIdeas(view, d) {
 }
 
 const VIEWS = {
-  home: viewHome, mastery: viewMastery, selfcheck: viewSelfcheck,
+  home: viewHome, goals: viewGoals, mastery: viewMastery, selfcheck: viewSelfcheck,
   notes: viewNotes, blockers: viewBlockers, people: viewPeople, ideas: viewIdeas,
   courses: viewCourses, fitness: viewFitness, books: viewBooks, mindpick: viewMindpick, military: viewMilitary
 };
