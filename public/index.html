@@ -576,6 +576,19 @@
   .field.sol { border-left: 2px solid var(--done); padding-left: 9px; }
   .entry .acts { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
 
+  /* ---------- 블루록 ---------- */
+  .rankbadge {
+    flex: 0 0 auto; width: 92px; height: 92px; border-radius: 24px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 3.1rem; font-weight: 900; letter-spacing: -.05em;
+    border: 2px solid; background: var(--raised);
+    box-shadow: 0 0 34px -10px currentColor, var(--lift);
+  }
+  .weeks { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; align-items: end; height: 84px; margin-top: 18px; }
+  .wcell { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 5px; }
+  .wbar { width: 100%; border-radius: 4px 4px 2px 2px; min-height: 4px; transition: height .6s cubic-bezier(.2,.8,.3,1); }
+  .wlab { font-size: .6rem; color: var(--faint); font-variant-numeric: tabular-nums; }
+
   /* ---------- 기록함 ---------- */
   .daysep {
     font-size: .72rem; font-weight: 700; color: var(--faint);
@@ -699,6 +712,7 @@ const TABS = [
   { id: 'goals',     emo: '🎯', name: '목표' },
   { id: 'mastery',   emo: '🧠', name: '숙달' },
   { id: 'notes',     emo: '📝', name: '노트' },
+  { id: 'bluelock',  emo: '⚡', name: '블루록' },
   { id: 'income',    emo: '💰', name: '수익' },
   { id: 'archive',   emo: '📜', name: '기록함' },
   { id: 'review',    emo: '📅', name: '주간 회고' },
@@ -722,7 +736,8 @@ const XP = {
   lecture: 10, workout: 20, page: 0.5, post: 30, task: 25, book: 60,
   note: 15, applied: 25, solved: 40, person: 15, idea: 5, shipped: 50,
   card: 5, review: 3, unaided: 20, check: 20,
-  step: 30, goalDone: 200, review: 40
+  step: 30, goalDone: 200, review: 40,
+  output: 40, steal: 20, stealUsed: 30
 };
 
 const GOAL_CATS = [
@@ -779,6 +794,9 @@ const ACHIEVEMENTS = [
   { id: 'goal3',    emo: '🏹', name: '목표 3개 달성', test: d => d.goals.filter(g => g.status === 'done').length >= 3 },
   { id: 'step25',   emo: '🪜', name: '과정 25개',    test: d => d.steps.filter(s => s.done).length >= 25 },
   { id: 'review4',  emo: '📅', name: '회고 4주',     test: d => d.reviews.length >= 4 },
+  { id: 'goal10',   emo: '⚽', name: '10골',        test: d => d.output.length >= 10 },
+  { id: 'rankA',    emo: '🅰️', name: 'A 등급',      test: d => weekOutputs(d, 0).length >= 8 || weekOutputs(d, 1).length >= 8 },
+  { id: 'steal5',   emo: '🎣', name: '흡수 5개',    test: d => d.steal.filter(s => s.used).length >= 5 },
   { id: 'cue5',     emo: '⏱', name: '실행 의도 5개', test: d => d.steps.filter(s => s.when_cue).length + d.goals.filter(g => g.when_cue).length >= 5 }
 ];
 
@@ -885,6 +903,8 @@ function total(d) {
   for (const s of d.steps)     if (s.done) xp += XP.step;
   for (const g of d.goals)     if (g.status === 'done') xp += XP.goalDone;
   for (const r of d.reviews)   xp += XP.review;
+  for (const o of d.output)    xp += XP.output;
+  for (const s of d.steal)     xp += XP.steal + (s.used ? XP.stealUsed : 0);
   return Math.round(xp);
 }
 
@@ -919,6 +939,8 @@ function activityMap(d) {
   d.steps.forEach(r => add(r.done_at));
   d.goals.forEach(r => add(r.updated_at));
   d.reviews.forEach(r => add(r.created_at));
+  d.output.forEach(r => add(r.date));
+  d.steal.forEach(r => add(r.created_at));
   return m;
 }
 
@@ -950,7 +972,7 @@ const streakOf = (d) => streakInfo(d).days;
 /* ============ API ============ */
 
 const ENDPOINTS = ['courses', 'fitness', 'books', 'mindpick', 'military', 'notes', 'blockers',
-                   'people', 'ideas', 'mastery', 'drills', 'selfcheck', 'goals', 'steps', 'reviews', 'income'];
+                   'people', 'ideas', 'mastery', 'drills', 'selfcheck', 'goals', 'steps', 'reviews', 'income', 'output', 'steal'];
 let DATA = null;
 let current = 'home';
 
@@ -1333,6 +1355,10 @@ function openQuickAdd(d) {
       grid.append(b);
     };
 
+    item('⚽', '골 (산출물)', '방금 내보낸 것', () => {
+      const v = prompt('무엇을 내보냈나?');
+      if (v && v.trim()) save('output', { date: today(), title: v.trim(), arena: 'etc' }, `+${XP.output} XP`);
+    });
     const gs = d.goals.filter(g => g.status === 'active');
     if (gs.length) {
       item('🎯', '목표 +1', gs[0].title.slice(0, 14), () =>
@@ -2098,6 +2124,208 @@ function viewMilitary(view, d) {
   }
 }
 
+/* ---------- ⚡ 블루록 ---------- */
+
+const ARENAS = [
+  ['reels',  '릴스',   '📱'],
+  ['thread', '스레드', '🧵'],
+  ['blog',   '블로그', '✍️'],
+  ['client', '외주',   '💼'],
+  ['etc',    '기타',   '📦']
+];
+const ARENA = Object.fromEntries(ARENAS.map(([k, n, e]) => [k, { name: n, emo: e }]));
+
+/* 주간 산출량 → 등급. 통제 가능한 숫자로만 매긴다. */
+const RANKS = [
+  { min: 12, r: 'S', color: 'var(--streak)' },
+  { min: 8,  r: 'A', color: 'var(--done)'   },
+  { min: 5,  r: 'B', color: 'var(--accent)' },
+  { min: 2,  r: 'C', color: 'var(--muted)'  },
+  { min: 1,  r: 'D', color: 'var(--faint)'  },
+  { min: 0,  r: 'F', color: 'var(--urgent)' }
+];
+const rankOf = (n) => RANKS.find(x => n >= x.min);
+
+function weekOutputs(d, offset) {
+  const ws = weekStart(offset || 0);
+  const we = iso(new Date(new Date(ws + 'T00:00:00').getTime() + 6 * 86400000));
+  return d.output.filter(o => o.date >= ws && o.date <= we);
+}
+
+const OUTPUT_FIELDS = [
+  { key: 'title', required: true, label: '무엇을 내보냈나', placeholder: '예) 후킹 3초 릴스 · 루틴편' },
+  { key: 'arena', label: '무대', type: 'select', options: ARENAS.map(([k, n]) => [k, n]), half: true },
+  { key: 'date', label: '날짜', type: 'date', half: true },
+  { key: 'reach', label: '도달 · 조회 (나중에 채워도 됨)', type: 'number', half: true },
+  { key: 'reactions', label: '반응 수', type: 'number', half: true },
+  { key: 'url', label: '링크' },
+  { key: 'note', label: '이번엔 뭘 시도했나', type: 'textarea' }
+];
+
+const STEAL_FIELDS = [
+  { key: 'target', required: true, label: '누구', placeholder: '예) @어떤_크리에이터' },
+  { key: 'what', required: true, label: '뭘 잘하나', placeholder: '예) 첫 3초 후킹' },
+  { key: 'how', label: '어떻게 하나 — 분해해서', type: 'textarea', placeholder: '질문으로 시작 → 답을 미룸 → 중간에 숫자 하나' },
+  { key: 'apply', label: '내가 쓸 것', type: 'textarea' },
+  { key: 'result', label: '써본 결과', type: 'textarea' }
+];
+
+function viewBluelock(view, d) {
+  const weapon = d.settings?.weapon || '아직 없음';
+  const cur = weekOutputs(d, 0);
+  const prev = weekOutputs(d, 1);
+  const rank = rankOf(cur.length);
+  const prevRank = rankOf(prev.length);
+  const moved = RANKS.indexOf(prevRank) - RANKS.indexOf(rank);   // +면 승급
+
+  /* 무기 선언 */
+  const wc = el('div', 'card herocard');
+  wc.append(el('h2', null, '내 무기'));
+  const wname = el('div');
+  wname.style.cssText = 'font-size:1.7rem;font-weight:800;letter-spacing:-.03em;line-height:1.2';
+  wname.textContent = weapon;
+  wc.append(wname);
+  const proof = d.output.filter(o => o.weapon_proof).length;
+  wc.append(el('div', 'next', `이 무기를 증명한 산출물 ${proof}개 · 전체 ${d.output.length}개`));
+  const wb = el('button', 'mini', '무기 바꾸기');
+  wb.style.marginTop = '12px';
+  wb.onclick = () => {
+    const v = prompt('무기 하나만. 다재다능은 무기가 아니다.', weapon);
+    if (v && v.trim()) api('settings', { method: 'POST', body: JSON.stringify({ weapon: v.trim() }) })
+      .then(() => { DATA = null; toast('무기 갱신', 'good'); render(); });
+  };
+  wc.append(wb);
+  view.append(wc);
+
+  /* 이번 주 랭크 */
+  const rc = card('이번 주 순위 발표');
+  const row = el('div', 'hero');
+  const badge = el('div', 'rankbadge');
+  badge.textContent = rank.r;
+  badge.style.color = rank.color;
+  badge.style.borderColor = rank.color;
+  row.append(badge);
+  const rb = el('div', 'herobody');
+  const big = el('div');
+  big.style.cssText = 'font-size:1.9rem;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums';
+  big.textContent = `${cur.length}골`;
+  rb.append(big);
+  rb.append(el('div', 'next', `지난주 ${prev.length}골 · ` +
+    (moved > 0 ? `${moved}단계 승급 🔺` : moved < 0 ? `${-moved}단계 강등 🔻` : '유지')));
+  const nextR = RANKS.slice().reverse().find(x => x.min > cur.length);
+  if (nextR) rb.append(el('div', 'need', `${nextR.r} 등급까지 ${nextR.min - cur.length}골`));
+  row.append(rb);
+  rc.append(row);
+
+  /* 최근 8주 */
+  const spark = el('div', 'weeks');
+  for (let i = 7; i >= 0; i--) {
+    const n = weekOutputs(d, i).length;
+    const cell = el('div', 'wcell');
+    const b = el('div', 'wbar');
+    b.style.height = Math.max(4, Math.min(100, n * 9)) + '%';
+    b.style.background = rankOf(n).color;
+    cell.append(b, el('div', 'wlab', i === 0 ? '이번' : `-${i}`));
+    spark.append(cell);
+  }
+  rc.append(spark);
+  view.append(rc);
+
+  /* 무대 테스트 — 어디에 무기를 꽂을지 반응으로 고른다 */
+  const ac = card('무대 테스트');
+  ac.append(el('div', 'empty', '무기는 정했으니 어디에 꽂을지를 찾는다. 산출량 대비 반응이 제일 좋은 무대가 답이다.'));
+  const used = ARENAS.filter(([k]) => d.output.some(o => o.arena === k));
+  if (!used.length) {
+    ac.append(el('div', 'empty', '아직 산출물이 없다. 무대 두세 개에 짧게 던져보는 것부터.'));
+  } else {
+    const rows = used.map(([k, n, e]) => {
+      const list = d.output.filter(o => o.arena === k);
+      const reach = list.reduce((s, o) => s + (+o.reach || 0), 0);
+      return { k, n, e, count: list.length, reach, eff: list.length ? Math.round(reach / list.length) : 0 };
+    }).sort((a, b) => b.eff - a.eff);
+    const maxEff = Math.max(1, ...rows.map(r => r.eff));
+    rows.forEach((r, i) => {
+      bar(ac, `${r.e} ${r.n}${i === 0 && r.eff > 0 ? '  👑' : ''}`, r.eff, maxEff,
+        `${r.count}개 · 평균 도달 ${num(r.eff)}`);
+    });
+    if (rows[0].eff > 0) {
+      ac.append(el('div', 'need', `지금까지는 ${rows[0].e} ${rows[0].n} 가 앞선다 — 표본이 쌓이면 여기 몰빵.`));
+    }
+  }
+  view.append(ac);
+
+  /* 골 넣기 */
+  const f = card();
+  f.append(collapsed('⚽ 산출물 기록 (골)', form(
+    OUTPUT_FIELDS.map(x => x.key === 'date' ? { ...x, value: today() } : x),
+    b => { b.arena = b.arena || 'etc'; b.date = b.date || today(); return save('output', b, `+${XP.output} XP`); }
+  ), !d.output.length));
+  view.append(f);
+
+  /* 흡수 */
+  const sc = card(`흡수 ${d.steal.filter(s => s.used).length}/${d.steal.length}`);
+  sc.append(el('div', 'empty', '남의 무기를 뜯어서 내 것으로. 분해해두지 않으면 감탄만 하고 끝난다.'));
+  d.steal.forEach(s => {
+    const e = el('div', 'entry');
+    const h = el('div', 'eh');
+    h.append(el('div', 'et', `${s.target} — ${s.what}`));
+    h.append(el('span', 'pill' + (s.used ? ' solved' : ''), s.used ? '써봄' : '미사용'));
+    e.append(h);
+    const fld = (k, v, cls) => {
+      if (!v) return;
+      const x = el('div', 'field' + (cls ? ' ' + cls : ''));
+      x.append(el('div', 'k', k), el('div', 'v', v));
+      e.append(x);
+    };
+    fld('어떻게', s.how);
+    fld('내가 쓸 것', s.apply, 'act');
+    fld('결과', s.result, 'sol');
+    const acts = el('div', 'acts');
+    if (!s.used) {
+      const u = el('button', 'mini ok', `써봤다 (+${XP.stealUsed}XP)`);
+      u.onclick = () => {
+        const v = prompt('써본 결과는?', '');
+        if (v === null) return;
+        patch('steal', s.id, { used: true, result: v }, `+${XP.stealUsed} XP`);
+      };
+      acts.append(u);
+    }
+    const del = el('button', 'mini danger', '삭제');
+    del.onclick = () => remove('steal', s.id, s.target);
+    acts.append(editBtn('흡수 수정', STEAL_FIELDS, s, 'steal'), del);
+    e.append(acts);
+    sc.append(e);
+  });
+  sc.append(collapsed('＋ 흡수 추가', form(STEAL_FIELDS, b => save('steal', b, `+${XP.steal} XP`))));
+  view.append(sc);
+
+  /* 최근 산출물 */
+  if (d.output.length) {
+    const lc = card('산출물');
+    d.output.slice(0, 30).forEach(o => {
+      const it = el('div', 'item');
+      it.append(el('div', 'aemo', ARENA[o.arena]?.emo || '📦'));
+      const g = el('div', 'grow');
+      const t = el('div', 't', o.title);
+      t.style.whiteSpace = 'normal';
+      g.append(t);
+      g.append(el('div', 'm', [o.date, ARENA[o.arena]?.name,
+        o.reach ? `도달 ${num(o.reach)}` : null, o.note].filter(Boolean).join(' · ')));
+      it.append(g);
+      const ed = el('button', 'mini', '반응');
+      ed.onclick = () => {
+        const v = prompt(`"${o.title}" 도달 · 조회수`, o.reach || '');
+        if (v !== null) patch('output', o.id, { reach: v.trim() });
+      };
+      const del = el('button', 'mini danger', '×');
+      del.onclick = () => remove('output', o.id, o.title);
+      it.append(ed, del);
+      lc.append(it);
+    });
+    view.append(lc);
+  }
+}
+
 /* ---------- 💰 수익 ---------- */
 
 const money = (n) => {
@@ -2272,6 +2500,10 @@ function allRecords(d) {
     const g = d.goals.find(x => String(x.id) === String(s.goal_id));
     push(s.done_at, '과정', '🪜', s.title, g ? g.title : '', 'goals');
   });
+  d.output.forEach(r => push(r.date, '산출물', '⚽', r.title,
+    [ARENA[r.arena]?.name, r.reach ? `도달 ${num(r.reach)}` : null, r.note].filter(Boolean).join(' · '), 'bluelock'));
+  d.steal.forEach(r => push(r.created_at, '흡수', '🎣', `${r.target} — ${r.what}`,
+    [r.how, r.used ? '써봄' : null].filter(Boolean).join(' · '), 'bluelock'));
   d.income.forEach(r => push(r.date, '수익', '💰', r.source,
     `${r.kind === 'expense' ? '지출' : '수입'} ${money(r.amount)}원`, 'income'));
   d.reviews.forEach(r => push(r.week_start, '회고', '📅', `${r.week_start} 주간 회고`,
@@ -2446,6 +2678,7 @@ function viewReview(view, d) {
   if (st.unaided > 0) obs.push(`안 보고 나온 게 ${st.unaided}번. 숙달 쪽은 굴러가는 중.`);
   if (st.solved === 0 && d.blockers.some(b => b.status !== 'solved')) obs.push('막힌 것이 그대로 남아 있다. 한 주에 하나는 풀어야 쌓이지 않는다.');
   if (st.steps === 0 && active.length) obs.push('과정을 하나도 못 끝냈다. 단계가 너무 큰 건 아닌지 확인.');
+  if (weekOutputs(d, 0).length === 0) obs.push('이번 주 산출물 0개. 내보낸 게 없으면 반응도 없고 배울 것도 없다.');
   if (!d.income.length) obs.push('수익 기록이 하나도 없다. 결과지표를 안 재면 지금 하는 게 맞는 방향인지 알 수 없다.');
   if (obs.length) {
     const oc = card('관찰');
@@ -3314,7 +3547,7 @@ function viewIdeas(view, d) {
 }
 
 const VIEWS = {
-  home: viewHome, goals: viewGoals, income: viewIncome, archive: viewArchive, review: viewReview, mastery: viewMastery, selfcheck: viewSelfcheck,
+  home: viewHome, goals: viewGoals, bluelock: viewBluelock, income: viewIncome, archive: viewArchive, review: viewReview, mastery: viewMastery, selfcheck: viewSelfcheck,
   notes: viewNotes, blockers: viewBlockers, people: viewPeople, ideas: viewIdeas,
   courses: viewCourses, fitness: viewFitness, books: viewBooks, mindpick: viewMindpick, military: viewMilitary
 };
