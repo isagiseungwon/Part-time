@@ -589,6 +589,36 @@
   .wbar { width: 100%; border-radius: 4px 4px 2px 2px; min-height: 4px; transition: height .6s cubic-bezier(.2,.8,.3,1); }
   .wlab { font-size: .6rem; color: var(--faint); font-variant-numeric: tabular-nums; }
 
+  /* ---------- 단계 · 메타비전 ---------- */
+  .phaserow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
+  .phase {
+    padding: 12px 6px; border-radius: 14px; text-align: center;
+    background: var(--raised); border: 1px solid var(--line); opacity: .42;
+    transition: opacity .3s, border-color .3s, box-shadow .3s;
+  }
+  .phase.past { opacity: .72; border-color: var(--done); }
+  .phase.on {
+    opacity: 1; border-color: var(--accent);
+    box-shadow: 0 0 22px -6px var(--accent), var(--lift);
+  }
+  .phemo { font-size: 1.4rem; line-height: 1.3; }
+  .phname { font-size: .74rem; font-weight: 750; margin-top: 2px; }
+  .phline { margin-top: 14px; font-size: .92rem; font-weight: 650; line-height: 1.5; }
+  .mvbig {
+    font-size: 3.2rem; font-weight: 900; letter-spacing: -.05em; line-height: 1.05;
+    margin-top: 8px; font-variant-numeric: tabular-nums;
+    background: linear-gradient(135deg, #86b6ef, var(--accent));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .mvlist { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .mvrow {
+    display: grid; grid-template-columns: 1fr auto 34px; align-items: center; gap: 10px;
+    padding: 9px 12px; border-radius: 12px; background: var(--raised);
+  }
+  .mvt { font-size: .8rem; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mvgap { font-size: .72rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .mvhit { font-size: .9rem; font-weight: 800; text-align: right; font-variant-numeric: tabular-nums; }
+
   /* ---------- 능력치 ---------- */
   .callout {
     margin-top: 16px; padding: 14px 16px; border-radius: 16px;
@@ -2180,7 +2210,9 @@ const OUTPUT_FIELDS = [
   { key: 'title', required: true, label: '무엇을 내보냈나', placeholder: '예) 후킹 3초 릴스 · 루틴편' },
   { key: 'arena', label: '무대', type: 'select', options: ARENAS.map(([k, n]) => [k, n]), half: true },
   { key: 'date', label: '날짜', type: 'date', half: true },
-  { key: 'reach', label: '도달 · 조회 (나중에 채워도 됨)', type: 'number', half: true },
+  { key: 'predicted_reach', label: '🔮 예상 도달 — 올리기 전에 먼저', type: 'number', half: true },
+  { key: 'reach', label: '실제 도달 (나중에)', type: 'number', half: true },
+  { key: 'predicted_why', label: '왜 그렇게 예상했나', type: 'textarea', placeholder: '예) 지난 루틴편이 2,400 나왔고 이번엔 후킹을 더 세게 잡아서' },
   { key: 'reactions', label: '반응 수', type: 'number', half: true },
   { key: 'url', label: '링크' },
   { key: 'note', label: '이번엔 뭘 시도했나', type: 'textarea' }
@@ -2220,6 +2252,52 @@ function stats6(d) {
     { k: 'aware', emo: '🪞', name: '자각',  v: aware, hint: '최근 4주 메타인지 · 주 1회 기준' },
     { k: 'steal', emo: '🎣', name: '흡수',  v: steal, hint: '흡수 적용률 (5개 이상일 때 만점 가능)' }
   ];
+}
+
+/* 메타비전 — 판을 얼마나 정확히 읽는가.
+   여섯 축은 "내가 뭘 얼마나 하는가"고, 이건 "내가 그 결과를 맞히는가"다.
+   실적은 운으로도 나오지만 예측 적중은 운으로 안 나온다. */
+function metavision(d) {
+  const pairs = d.output
+    .filter(o => +o.predicted_reach > 0 && +o.reach > 0)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    .slice(0, 8);                                  // 최근 8개 — 옛날 감은 지금 감이 아니다
+
+  if (!pairs.length) return { n: 0, score: 0, ready: false, pairs: [] };
+
+  const errs = pairs.map(o => {
+    const p = +o.predicted_reach, a = +o.reach;
+    return { o, p, a, err: Math.abs(a - p) / Math.max(a, p), over: p > a };
+  });
+  const mean = errs.reduce((s, e) => s + e.err, 0) / errs.length;
+  return {
+    n: errs.length,
+    score: Math.max(0, Math.round((1 - mean) * 100)),
+    ready: errs.length >= 3,
+    over: errs.filter(e => e.over).length,
+    pairs: errs
+  };
+}
+
+/* 이사기도 여섯 개를 먼저 세우고, 판이 보이기 시작한 뒤에 다이렉트 슛을 뽑았다.
+   순서를 뒤집으면 무기가 아니라 편식이 된다. */
+function phaseOf(st, mv) {
+  const low = Math.min(...st.map(x => x.v));
+  if (low < 40) return {
+    n: 1, name: '균형기', emo: '🧱',
+    line: '아직 무기를 고를 때가 아니다. 제일 낮은 축부터 40까지.',
+    why: `최저 축 ${low} · 40 넘으면 다음 단계`
+  };
+  if (!mv.ready) return {
+    n: 2, name: '관측기', emo: '👁️',
+    line: '축은 섰다. 이제 판이 보이는지 확인할 차례 — 올리기 전에 결과를 먼저 적어라.',
+    why: `예측·실제 짝 ${mv.n}개 · 3개부터 메타비전이 계산됨`
+  };
+  return {
+    n: 3, name: '특화기', emo: '⚔️',
+    line: '판이 읽힌다. 이제 하나에 몰아넣어도 되는 구간이다.',
+    why: `최저 축 ${low} · 메타비전 ${mv.score}`
+  };
 }
 
 /* 육각형 레이더. 한 사람의 한 시점이라 계열은 하나 — 색도 하나만 쓴다. */
@@ -2300,6 +2378,9 @@ function radar(items, size) {
 
 function viewBluelock(view, d) {
   const weapon = d.settings?.weapon || '아직 없음';
+  const st = stats6(d);
+  const mv = metavision(d);
+  const ph = phaseOf(st, mv);
   const cur = weekOutputs(d, 0);
   const prev = weekOutputs(d, 1);
   const rank = rankOf(cur.length);
@@ -2314,7 +2395,9 @@ function viewBluelock(view, d) {
   wname.textContent = weapon;
   wc.append(wname);
   const proof = d.output.filter(o => o.weapon_proof).length;
-  wc.append(el('div', 'next', `이 무기를 증명한 산출물 ${proof}개 · 전체 ${d.output.length}개`));
+  wc.append(el('div', 'next', ph.n < 3
+    ? `아직 ${ph.name}. 이건 확정이 아니라 가설이다 — 증명한 산출물 ${proof}개 / 전체 ${d.output.length}개`
+    : `증명한 산출물 ${proof}개 · 전체 ${d.output.length}개`));
   const wb = el('button', 'mini', '무기 바꾸기');
   wb.style.marginTop = '12px';
   wb.onclick = () => {
@@ -2325,8 +2408,50 @@ function viewBluelock(view, d) {
   wc.append(wb);
   view.append(wc);
 
+  /* 단계 — 균형이 먼저, 무기는 그 다음. 순서를 지키게 만드는 게 이 카드의 일이다. */
+  const pc = card('지금 단계');
+  const prow = el('div', 'phaserow');
+  [[1, '🧱', '균형기'], [2, '👁️', '관측기'], [3, '⚔️', '특화기']].forEach(([n, e, nm]) => {
+    const s = el('div', 'phase' + (n === ph.n ? ' on' : n < ph.n ? ' past' : ''));
+    s.append(el('div', 'phemo', e));
+    s.append(el('div', 'phname', nm));
+    prow.append(s);
+  });
+  pc.append(prow);
+  pc.append(el('div', 'phline', ph.line));
+  pc.append(el('div', 'next', ph.why));
+  view.append(pc);
+
+  /* 메타비전 — 여섯 축 위에 따로 세운다. 종류가 다른 능력이라서. */
+  const mc = card('🔮 메타비전');
+  mc.append(el('div', 'empty', '판을 읽는 정확도. 올리기 전에 예상 도달을 적어두면, 실제와 대조해서 매겨진다.'));
+  if (!mv.ready) {
+    mc.append(el('div', 'mvbig', mv.n ? `${mv.n}/3` : '—'));
+    mc.append(el('div', 'next', mv.n
+      ? `짝이 ${mv.n}개. 3개부터 점수가 나온다.`
+      : '아직 예측한 산출물이 없다. 다음에 올릴 때 🔮 예상 도달부터 적어라.'));
+  } else {
+    mc.append(el('div', 'mvbig', String(mv.score)));
+    const tend = mv.over > mv.n / 2 ? '과대평가 쪽으로 기운다' : mv.over < mv.n / 2 ? '과소평가 쪽으로 기운다' : '위아래로 고르게 틀린다';
+    mc.append(el('div', 'next', `최근 ${mv.n}개 기준 · ${tend}`));
+    const list = el('div', 'mvlist');
+    mv.pairs.forEach(e => {
+      const r = el('div', 'mvrow');
+      r.append(el('div', 'mvt', e.o.title || '(제목 없음)'));
+      const gap = el('div', 'mvgap');
+      gap.textContent = `${e.p.toLocaleString()} → ${e.a.toLocaleString()}`;
+      r.append(gap);
+      const hit = el('div', 'mvhit');
+      hit.textContent = Math.round((1 - e.err) * 100);
+      hit.style.color = e.err <= 0.2 ? 'var(--done)' : e.err <= 0.5 ? 'var(--streak)' : 'var(--urgent)';
+      r.append(hit);
+      list.append(r);
+    });
+    mc.append(list);
+  }
+  view.append(mc);
+
   /* 능력치 — 순위는 골 하나로, 스탯은 여러 축으로 */
-  const st = stats6(d);
   const stc = card('능력치');
   stc.append(el('div', 'empty', '순위는 산출 하나로 매긴다. 하지만 그 산출을 만드는 건 여섯 개다.'));
   stc.append(radar(st, 300));

@@ -40,7 +40,8 @@ const RESOURCES = {
   income:    { table: 'me_income',        orderBy: 'date',
                fields: ['date', 'kind', 'source', 'amount', 'note'] },
   output:    { table: 'me_output',        orderBy: 'date',
-               fields: ['date', 'arena', 'title', 'url', 'reach', 'reactions', 'weapon_proof', 'note'] },
+               fields: ['date', 'arena', 'title', 'url', 'reach', 'reactions', 'weapon_proof', 'note',
+                        'predicted_reach', 'predicted_why'] },
   steal:     { table: 'me_steal',         orderBy: 'created_at',
                fields: ['target', 'what', 'how', 'apply', 'used', 'result'] }
 };
