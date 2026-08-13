@@ -589,6 +589,27 @@
   .wbar { width: 100%; border-radius: 4px 4px 2px 2px; min-height: 4px; transition: height .6s cubic-bezier(.2,.8,.3,1); }
   .wlab { font-size: .6rem; color: var(--faint); font-variant-numeric: tabular-nums; }
 
+  /* ---------- 증거 ---------- */
+  .ba { margin-top: 12px; padding: 14px; border-radius: 14px; background: var(--raised); }
+  .bametric {
+    font-size: .68rem; color: var(--faint); letter-spacing: .06em; margin-bottom: 10px;
+  }
+  .baline { display: flex; align-items: center; gap: 12px; }
+  .bacell { flex: 1 1 0; min-width: 0; }
+  .balab { font-size: .62rem; color: var(--faint); letter-spacing: .06em; }
+  .baval {
+    font-size: 1.25rem; font-weight: 800; letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis;
+  }
+  .bacell.pred .baval { color: var(--muted); font-weight: 650; }
+  .bacell.after .baval { color: var(--done); }
+  .baarrow { flex: 0 0 auto; color: var(--faint); font-size: 1rem; }
+  .warnbox {
+    margin-top: 12px; padding: 11px 13px; border-radius: 12px;
+    background: rgba(208, 59, 59, .12); border: 1px solid rgba(208, 59, 59, .35);
+    color: var(--text); font-size: .78rem; line-height: 1.5;
+  }
+
   /* ---------- 단계 · 메타비전 ---------- */
   .phaserow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 4px; }
   .phase {
@@ -767,6 +788,7 @@ const TABS = [
   { id: 'mastery',   emo: '🧠', name: '숙달' },
   { id: 'notes',     emo: '📝', name: '노트' },
   { id: 'bluelock',  emo: '⚡', name: '블루록' },
+  { id: 'cases',     emo: '🧾', name: '증거' },
   { id: 'income',    emo: '💰', name: '수익' },
   { id: 'archive',   emo: '📜', name: '기록함' },
   { id: 'review',    emo: '📅', name: '주간 회고' },
@@ -791,7 +813,8 @@ const XP = {
   note: 15, applied: 25, solved: 40, person: 15, idea: 5, shipped: 50,
   card: 5, review: 3, unaided: 20, check: 20,
   step: 30, goalDone: 200, review: 40,
-  output: 40, steal: 20, stealUsed: 30
+  output: 40, steal: 20, stealUsed: 30,
+  caseOpen: 60, caseDone: 300
 };
 
 const GOAL_CATS = [
@@ -1026,7 +1049,7 @@ const streakOf = (d) => streakInfo(d).days;
 /* ============ API ============ */
 
 const ENDPOINTS = ['courses', 'fitness', 'books', 'mindpick', 'military', 'notes', 'blockers',
-                   'people', 'ideas', 'mastery', 'drills', 'selfcheck', 'goals', 'steps', 'reviews', 'income', 'output', 'steal'];
+                   'people', 'ideas', 'mastery', 'drills', 'selfcheck', 'goals', 'steps', 'reviews', 'income', 'output', 'steal', 'cases'];
 let DATA = null;
 let current = 'home';
 
@@ -2527,6 +2550,30 @@ function viewBluelock(view, d) {
   rc.append(spark);
   view.append(rc);
 
+  /* 증거 — 순위와 다른 시계로 움직인다. 산출은 주 단위, 증거는 달 단위. */
+  const ready = d.cases.filter(caseReady).length;
+  const running = d.cases.filter(c => (c.status || 'running') === 'running').length;
+  const ec = card('증거');
+  ec.append(el('div', 'empty',
+    '순위는 주마다 다시 매겨지고 사라진다. 증거는 남아서 다음 고객에게 보여진다. ' +
+    '산출 100개보다 증거 3개가 돈이 된다.'));
+  const erow = el('div', 'calrow');
+  [['내놓을 수 있음', String(ready), ready ? '공개 허락까지 됨' : '아직 없음'],
+   ['진행 중', String(running), running ? '끝나면 증거로' : '시작한 게 없다'],
+   ['전체', String(d.cases.length), '누적']].forEach(([lab, num, sub]) => {
+    const c = el('div', 'calcell');
+    c.append(el('div', 'callab', lab));
+    c.append(el('div', 'calnum', num));
+    c.append(el('div', 'calsub', sub));
+    erow.append(c);
+  });
+  ec.append(erow);
+  const eb = el('button', 'mini', ready || running ? '증거 보러 가기' : '첫 케이스 시작하기');
+  eb.style.marginTop = '14px';
+  eb.onclick = () => goTab('cases');
+  ec.append(eb);
+  view.append(ec);
+
   /* 무대 테스트 — 어디에 무기를 꽂을지 반응으로 고른다 */
   const ac = card('무대 테스트');
   ac.append(el('div', 'empty', '무기는 정했으니 어디에 꽂을지를 찾는다. 산출량 대비 반응이 제일 좋은 무대가 답이다.'));
@@ -3784,6 +3831,185 @@ const IDEA_FIELDS = [
   { key: 'detail', label: '설명 — 누구의 어떤 문제를 푸는가', type: 'textarea' }
 ];
 
+/* 케이스 = 남에게 무엇을 해줬고 그래서 뭐가 달라졌나.
+   산출물은 혼자서도 쌓이지만 기획으로 돈을 받는 근거는 이쪽이다.
+   before 를 시작할 때 안 적으면 끝나고 증명할 방법이 없으므로 필수로 둔다. */
+const CASE_FIELDS = [
+  { key: 'client', required: true, label: '누구', placeholder: '예) OO 스터디카페' },
+  { key: 'problem', required: true, label: '뭐가 아팠나', type: 'textarea', placeholder: '예) 한 번 오고 안 온다 · 정기권 전환이 안 됨' },
+  { key: 'weapon', label: '쓴 무기', placeholder: '예) 기획 · 구조화', half: true },
+  { key: 'metric_name', required: true, label: '뭘 재나', placeholder: '예) 정기권 매출 비중', half: true },
+  { key: 'before_value', required: true, label: '시작 값 — 지금 안 적으면 증명 못 한다', placeholder: '예) 18%', half: true },
+  { key: 'before_at', label: '측정일', type: 'date', half: true },
+  { key: 'predicted_after', label: '🔮 끝나면 얼마가 될 것 같나', placeholder: '예) 28%', half: true },
+  { key: 'scope', label: '어디까지 하기로 했나', placeholder: '예) 4주 진단 + 개선안 1건. 제작·운영대행 제외' },
+  { key: 'paid', label: '형태', type: 'select', options: [['free', '무료'], ['paid', '유료']], half: true },
+  { key: 'amount', label: '금액 (원)', type: 'number', half: true }
+];
+
+const CASE_STATUS = [
+  ['running', '진행 중'],
+  ['done', '끝남'],
+  ['public', '공개 가능']
+];
+
+function caseReady(c) {
+  return c.status === 'public' || (c.after_value && c.permission);
+}
+
+function viewCases(view, d) {
+  const rows = d.cases;
+  const ready = rows.filter(caseReady).length;
+
+  const head = card('증거');
+  head.append(el('div', 'empty',
+    '산출물은 "내가 뭘 냈나"고, 증거는 "남에게 뭐가 달라졌나"다. ' +
+    '기획으로 돈을 받는 근거는 이쪽이다. 100개 올린 사람보다 증거 3개 가진 사람이 받는다.'));
+
+  const hero = el('div', 'hero');
+  const badge = el('div', 'rankbadge');
+  badge.textContent = ready;
+  badge.style.color = ready ? 'var(--done)' : 'var(--faint)';
+  badge.style.borderColor = ready ? 'var(--done)' : 'var(--line)';
+  hero.append(badge);
+  const hb = el('div', 'herobody');
+  hb.append(el('div', 'phline', ready
+    ? `내놓을 수 있는 증거 ${ready}개`
+    : '아직 내놓을 수 있는 증거가 없다'));
+  hb.append(el('div', 'next', rows.length
+    ? `전체 ${rows.length}건 · 진행 중 ${rows.filter(c => c.status === 'running').length}건`
+    : '첫 건은 아는 사람이어도 된다. 숫자만 제대로 남기면 증거다.'));
+  hero.append(hb);
+  head.append(hero);
+  view.append(head);
+
+  const f = card();
+  f.append(collapsed('＋ 케이스 시작', form(CASE_FIELDS, b => {
+    b.status = 'running';
+    b.paid = b.paid || 'free';
+    b.before_at = b.before_at || today();
+    return save('cases', b, `+${XP.caseOpen} XP`);
+  }), !rows.length));
+  view.append(f);
+
+  if (!rows.length) return;
+
+  CASE_STATUS.forEach(([st, label]) => {
+    const group = rows.filter(c => (c.status || 'running') === st);
+    if (!group.length) return;
+    const c = card(`${label} ${group.length}`);
+
+    group.forEach(r => {
+      const e = el('div', 'entry');
+      const h = el('div', 'eh');
+      h.append(el('div', 'et', r.client));
+      h.append(el('span', 'pill' + (st === 'public' ? ' solved' : st === 'done' ? ' trying' : ''), label));
+      e.append(h);
+      e.append(el('div', 'src', [r.weapon, r.paid === 'paid' ? '유료' : '무료',
+        r.amount ? Number(r.amount).toLocaleString() + '원' : null].filter(Boolean).join(' · ')));
+
+      if (r.problem) {
+        const x = el('div', 'field');
+        x.append(el('div', 'k', '아팠던 것'), el('div', 'v', r.problem));
+        e.append(x);
+      }
+
+      /* 전 → 후. 케이스의 전부가 이 한 줄이다. */
+      const ba = el('div', 'ba');
+      ba.append(el('div', 'bametric', r.metric_name || '지표'));
+      const line = el('div', 'baline');
+      const mk = (lab, val, cls) => {
+        const b = el('div', 'bacell' + (cls ? ' ' + cls : ''));
+        b.append(el('div', 'balab', lab));
+        b.append(el('div', 'baval', val || '—'));
+        return b;
+      };
+      line.append(mk('전', r.before_value));
+      if (r.predicted_after && !r.after_value) line.append(mk('예상', r.predicted_after, 'pred'));
+      line.append(el('div', 'baarrow', '→'));
+      line.append(mk('후', r.after_value, r.after_value ? 'after' : ''));
+      ba.append(line);
+      if (r.predicted_after && r.after_value) {
+        ba.append(el('div', 'next', `예상은 ${r.predicted_after} 이었다 — 메타비전 대조용`));
+      }
+      e.append(ba);
+
+      if (r.did) {
+        const x = el('div', 'field');
+        x.append(el('div', 'k', '뭘 했나'), el('div', 'v', r.did));
+        e.append(x);
+      }
+      if (r.learned) {
+        const x = el('div', 'field');
+        x.append(el('div', 'k', '배운 것'), el('div', 'v', r.learned));
+        e.append(x);
+      }
+      if (r.scope) e.append(el('div', 'next', `범위: ${r.scope}`));
+
+      /* 시작 값이 비면 이 케이스는 끝나도 증거가 안 된다. 제일 먼저 말해야 한다. */
+      if (!r.before_value) {
+        const w = el('div', 'warnbox');
+        w.textContent = '시작 값이 비어 있다. 지금 안 재두면 4주 뒤에 좋아졌다고 말할 근거가 없다.';
+        e.append(w);
+        const bm = el('button', 'mini go', '시작 값 입력');
+        bm.style.marginTop = '10px';
+        bm.onclick = () => {
+          const v = prompt(`지금 ${r.metric_name || '지표'} 값은?`, '');
+          if (v === null || !v.trim()) return;
+          patch('cases', r.id, { before_value: v.trim(), before_at: today() });
+        };
+        e.append(bm);
+      }
+
+      /* 허락 없는 케이스는 케이스가 아니다. 조용히 두면 나중에 못 받는다. */
+      if (!r.permission) {
+        const w = el('div', 'warnbox');
+        w.textContent = st === 'running'
+          ? '공개 허락 아직 — 시작할 때 받아두는 게 끝나고 부탁하는 것보다 쉽다.'
+          : '공개 허락이 없다. 이 상태로는 어디에도 못 쓴다.';
+        e.append(w);
+      }
+
+      const acts = el('div', 'acts');
+      if (!r.permission) {
+        const b0 = el('button', 'mini go', '공개 허락 받음');
+        b0.onclick = () => patch('cases', r.id, { permission: true });
+        acts.append(b0);
+      }
+      if (st === 'running') {
+        const b1 = el('button', 'mini ok', '결과 입력');
+        b1.onclick = () => {
+          const v = prompt(`끝난 뒤 ${r.metric_name || '지표'} 값은?`, r.after_value || '');
+          if (v === null || !v.trim()) return;
+          patch('cases', r.id, { after_value: v.trim(), after_at: today(), status: 'done' }, `+${XP.caseDone} XP`);
+        };
+        acts.append(b1);
+      }
+      if (st === 'done' && r.permission) {
+        const b2 = el('button', 'mini ok', '공개 가능으로');
+        b2.onclick = () => patch('cases', r.id, { status: 'public' });
+        acts.append(b2);
+      }
+      const be = el('button', 'mini', '수정');
+      be.onclick = () => openEdit('케이스 수정', CASE_FIELDS.concat([
+        { key: 'did', label: '뭘 했나', type: 'textarea' },
+        { key: 'learned', label: '배운 것 — 실패해도 자산이다', type: 'textarea' },
+        { key: 'after_value', label: '끝난 값', half: true },
+        { key: 'after_at', label: '측정일', type: 'date', half: true },
+        { key: 'link', label: '링크' }
+      ]), r, 'cases');
+      acts.append(be);
+      const bd = el('button', 'mini del', '삭제');
+      bd.onclick = () => remove('cases', r.id, r.client);
+      acts.append(bd);
+      e.append(acts);
+
+      c.append(e);
+    });
+    view.append(c);
+  });
+}
+
 function viewIdeas(view, d) {
   const rows = d.ideas;
 
@@ -3843,7 +4069,7 @@ function viewIdeas(view, d) {
 }
 
 const VIEWS = {
-  home: viewHome, goals: viewGoals, bluelock: viewBluelock, income: viewIncome, archive: viewArchive, review: viewReview, mastery: viewMastery, selfcheck: viewSelfcheck,
+  home: viewHome, goals: viewGoals, bluelock: viewBluelock, cases: viewCases, income: viewIncome, archive: viewArchive, review: viewReview, mastery: viewMastery, selfcheck: viewSelfcheck,
   notes: viewNotes, blockers: viewBlockers, people: viewPeople, ideas: viewIdeas,
   courses: viewCourses, fitness: viewFitness, books: viewBooks, mindpick: viewMindpick, military: viewMilitary
 };

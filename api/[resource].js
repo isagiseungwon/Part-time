@@ -43,7 +43,11 @@ const RESOURCES = {
                fields: ['date', 'arena', 'title', 'url', 'reach', 'reactions', 'weapon_proof', 'note',
                         'predicted_reach', 'predicted_why'] },
   steal:     { table: 'me_steal',         orderBy: 'created_at',
-               fields: ['target', 'what', 'how', 'apply', 'used', 'result'] }
+               fields: ['target', 'what', 'how', 'apply', 'used', 'result'] },
+  cases:     { table: 'me_cases',         orderBy: 'created_at',
+               fields: ['client', 'weapon', 'problem', 'metric_name', 'before_value', 'before_at',
+                        'predicted_after', 'after_value', 'after_at', 'did', 'learned',
+                        'paid', 'amount', 'permission', 'scope', 'link', 'status', 'updated_at'] }
 };
 
 const HANDLERS = Object.fromEntries(
