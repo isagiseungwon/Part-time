@@ -520,6 +520,17 @@
   textarea { min-height: 68px; resize: vertical; }
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
+  /* .chk 는 퀘스트 체크 버튼이 이미 쓰고 있다 — 이름을 겹치면 22px 로 찌그러진다 */
+  .checks { display: flex; flex-direction: column; gap: 2px; }
+  .chkrow {
+    display: flex; align-items: flex-start; gap: 10px; margin: 0;
+    padding: 9px 11px; border-radius: 11px; background: var(--raised);
+    border: 1px solid var(--line); font-size: .82rem; color: var(--text);
+    line-height: 1.4; cursor: pointer;
+  }
+  .chkrow input { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 1px; accent-color: var(--accent); }
+  .chkrow:has(input:checked) { border-color: var(--done); color: var(--done); }
+
   button.submit {
     width: 100%; margin-top: 16px; background: var(--accent); color: #fff;
     border: none; border-radius: 11px; padding: 13px;
@@ -710,6 +721,10 @@
 
   .steps { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
   .stephead { font-size: .7rem; color: var(--faint); letter-spacing: .05em; text-transform: uppercase; margin-bottom: 8px; }
+  .sechead {
+    margin: 20px 0 10px; font-size: .7rem; color: var(--faint);
+    letter-spacing: .05em; text-transform: uppercase;
+  }
   .steprow { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: .86rem; }
   .steprow .t { line-height: 1.35; }
   .steprow .m { font-size: .72rem; color: var(--faint); }
@@ -902,6 +917,14 @@ const iso = (d) => d.toISOString().slice(0, 10);
 const today = () => iso(new Date());
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return iso(d); };
 const num = (v) => (v == null ? 0 : Number(v)).toLocaleString('ko-KR');
+
+/* 받침에 맞는 조사. "공유이(가) 앞선다" 가 화면에 나오면 읽다가 걸린다. */
+const josa = (word, withBat, without) => {
+  const w = String(word);
+  const c = w.charCodeAt(w.length - 1);
+  const bat = c >= 0xac00 && c <= 0xd7a3 ? (c - 0xac00) % 28 !== 0 : true;
+  return w + (bat ? withBat : without);
+};
 
 const CALM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -1280,13 +1303,31 @@ function form(fields, onSubmit, submitLabel) {
       f.options.forEach(([v, t]) => { const o = el('option', null, t); o.value = v; input.append(o); });
     } else if (f.type === 'textarea') {
       input = el('textarea');
+    } else if (f.type === 'checks') {
+      /* 통과 개수만 저장한다. 어느 항목이었는지는 남지 않지만, 이 칸의 일은
+         기록이 아니라 올리기 전에 다섯 줄을 실제로 읽게 만드는 것이다. */
+      input = el('div', 'checks');
+      f.items.forEach(t => {
+        const row = el('label', 'chkrow');
+        const box = el('input');
+        box.type = 'checkbox';
+        row.append(box, el('span', null, t));
+        input.append(row);
+      });
+      Object.defineProperty(input, 'value', {
+        /* 하나도 안 눌렀으면 빈 값 — "검사 안 함" 과 "다 떨어짐" 은 다르다 */
+        get: () => {
+          const n = [...input.querySelectorAll('input')].filter(x => x.checked).length;
+          return n ? String(n) : '';
+        }
+      });
     } else {
       input = el('input');
       input.type = f.type || 'text';
       if (f.step) input.step = f.step;
       if (f.type === 'number') input.inputMode = 'decimal';
     }
-    if (f.value !== undefined) input.value = f.value;
+    if (f.value !== undefined && f.type !== 'checks') input.value = f.value;
     if (f.placeholder) input.placeholder = f.placeholder;
     inputs[f.key] = input;
     holder.append(input);
@@ -2229,17 +2270,63 @@ function weekOutputs(d, offset) {
   return d.output.filter(o => o.date >= ws && o.date <= we);
 }
 
+/* 신호에는 값의 순서가 있다. 공유는 남의 타임라인으로 건너간 것이고,
+   저장은 다시 꺼내겠다고 한 것이고, 도달은 스쳐 간 숫자다.
+   도달만 적으면 제일 약한 신호로 다음 판을 짜게 된다. */
+const SIGNALS = [
+  { key: 'shares', label: '공유', emo: '📤', rank: 1, why: '남의 타임라인으로 건너갔다' },
+  { key: 'saves',  label: '저장', emo: '🔖', rank: 2, why: '다시 꺼내겠다고 했다' },
+  { key: 'reach',  label: '도달', emo: '👀', rank: 3, why: '스쳐 갔다' }
+];
+
+/* 형식 — 무엇을 말했나가 아니라 어떤 틀에 담았나. 같은 내용도 틀에 따라 안 퍼진다. */
+const FORMS = [
+  ['list',    '목록형', '📋', '개수로 묶는다 — "3가지"'],
+  ['vs',      '비교형', '⚖️', '둘을 붙인다 — "A vs B"'],
+  ['paradox', '역설형', '🌀', '통념을 뒤집는다 — "사실 반대다"'],
+  ['hybrid',  '혼합형', '🧬', '둘 이상을 겹친다']
+];
+const FORM = Object.fromEntries(FORMS.map(([k, n, e, d]) => [k, { name: n, emo: e, desc: d }]));
+
+/* 올리기 전 다섯 줄. 공유·저장을 노리는 검사지, 조회수를 노리는 검사가 아니다. */
+const HOOK_ITEMS = [
+  '첫 문장만 읽어도 멈출 이유가 있다',
+  '남한테 보낼 이유가 있다 (공유)',
+  '나중에 다시 꺼낼 이유가 있다 (저장)',
+  '주장이 하나다 — 두 개면 둘 다 안 남는다',
+  '끝에 다음 행동이 있다'
+];
+const HOOK_PASS = 4;   // 5개 중 4개. 다 채우라고 하면 안 채우고 올린다
+
+/* 올린 뒤에 채우는 칸. 순위를 라벨에 박아둔다 — 폼에서도 순서가 보여야 한다. */
+const RESULT_FIELDS = [
+  { key: 'shares',    label: '📤 공유 1순위', type: 'number', half: true },
+  { key: 'saves',     label: '🔖 저장 2순위', type: 'number', half: true },
+  { key: 'reach',     label: '👀 도달 3순위', type: 'number', half: true },
+  { key: 'reactions', label: '💬 반응 수',    type: 'number', half: true }
+];
+
 const OUTPUT_FIELDS = [
   { key: 'title', required: true, label: '무엇을 내보냈나', placeholder: '예) 후킹 3초 릴스 · 루틴편' },
   { key: 'arena', label: '무대', type: 'select', options: ARENAS.map(([k, n]) => [k, n]), half: true },
   { key: 'date', label: '날짜', type: 'date', half: true },
-  { key: 'predicted_reach', label: '🔮 예상 도달 — 올리기 전에 먼저', type: 'number', half: true },
-  { key: 'reach', label: '실제 도달 (나중에)', type: 'number', half: true },
+  { key: 'form', label: '형식', type: 'select', half: true,
+    options: [['', '— 고르기'], ...FORMS.map(([k, n, e]) => [k, `${e} ${n}`])] },
+  { key: 'predicted_reach', label: '🔮 예상 도달 (먼저)', type: 'number', half: true },
   { key: 'predicted_why', label: '왜 그렇게 예상했나', type: 'textarea', placeholder: '예) 지난 루틴편이 2,400 나왔고 이번엔 후킹을 더 세게 잡아서' },
-  { key: 'reactions', label: '반응 수', type: 'number', half: true },
+  { key: 'hook_checks', label: '올리기 전 검사 — 통과한 것만 누른다', type: 'checks', items: HOOK_ITEMS },
+  ...RESULT_FIELDS,
   { key: 'url', label: '링크' },
   { key: 'note', label: '이번엔 뭘 시도했나', type: 'textarea' }
 ];
+
+/* 수정 시트에는 체크리스트 대신 숫자를 둔다 — 어느 항목이 통과했는지는 저장되지 않아서
+   체크박스를 다시 그리면 없는 정보를 지어내게 된다. */
+const OUTPUT_EDIT_FIELDS = OUTPUT_FIELDS.map(f =>
+  f.key === 'hook_checks'
+    ? { key: 'hook_checks', label: `올리기 전 검사 통과 (0–${HOOK_ITEMS.length})`, type: 'number' }
+    : f
+);
 
 const STEAL_FIELDS = [
   { key: 'target', required: true, label: '누구', placeholder: '예) @어떤_크리에이터' },
@@ -2275,6 +2362,35 @@ function stats6(d) {
     { k: 'aware', emo: '🪞', name: '자각',  v: aware, hint: '최근 4주 메타인지 · 주 1회 기준' },
     { k: 'steal', emo: '🎣', name: '흡수',  v: steal, hint: '흡수 적용률 (5개 이상일 때 만점 가능)' }
   ];
+}
+
+/* 지금 무엇으로 비교할 수 있나. 공유가 하나라도 적혀 있으면 공유로 매기고,
+   없으면 저장, 그것도 없으면 도달까지 내려온다. 없는 신호로는 비교를 못 한다. */
+function bestSignal(list) {
+  return SIGNALS.find(s => list.some(o => +o[s.key] > 0)) || SIGNALS[SIGNALS.length - 1];
+}
+
+const avgBy = (rows, key) =>
+  rows.length ? Math.round(rows.reduce((s, o) => s + (+o[key] || 0), 0) / rows.length) : 0;
+
+/* 형식별 평균. 1개짜리 평균은 평균이 아니라 우연이라 표본 수를 같이 낸다. */
+function byForm(list, sig) {
+  return FORMS.map(([k, n, e]) => {
+    const rows = list.filter(o => o.form === k);
+    return { k, n, e, count: rows.length, avg: avgBy(rows, sig.key) };
+  }).filter(x => x.count).sort((a, b) => b.avg - a.avg);
+}
+
+/* 검사지도 검사받는다. 통과시키고 올린 것이 실제로 더 퍼지지 않으면 검사가 틀린 것이다. */
+function hookEffect(list, sig) {
+  const rated = list.filter(o => o.hook_checks != null && o.hook_checks !== '' && +o[sig.key] > 0);
+  const pass = rated.filter(o => +o.hook_checks >= HOOK_PASS);
+  const fail = rated.filter(o => +o.hook_checks < HOOK_PASS);
+  return {
+    pass: pass.length, fail: fail.length,
+    passAvg: avgBy(pass, sig.key), failAvg: avgBy(fail, sig.key),
+    ready: pass.length >= 2 && fail.length >= 2
+  };
 }
 
 /* 메타비전 — 판을 얼마나 정확히 읽는가.
@@ -2496,7 +2612,7 @@ function viewBluelock(view, d) {
   cal.append(grid);
   cal.append(el('div', 'next', low.v >= 60
     ? '구멍이 없다. 이번 달은 강점을 더 깊게 파도 된다.'
-    : `${low.name}이(가) 제일 낮다. ${low.hint} — 여기부터 올린다.`));
+    : `${josa(low.name, '이', '가')} 제일 낮다. ${low.hint} — 여기부터 올린다.`));
   stc.append(cal);
 
   const ax = el('div', 'axes');
@@ -2574,22 +2690,95 @@ function viewBluelock(view, d) {
   ec.append(eb);
   view.append(ec);
 
+  /* 신호 — 무엇을 보고 다음 판을 짤 것인가.
+     도달은 제일 약한 신호인데 제일 눈에 잘 띈다. 그래서 순서를 화면에 박아둔다. */
+  const sig = bestSignal(d.output);
+  const gc = card('신호');
+  gc.append(el('div', 'empty',
+    '공유 > 저장 > 도달. 위에서부터 값이 세다. 공유는 남이 자기 이름을 걸고 옮긴 것이고, ' +
+    '도달은 그냥 스쳐 간 숫자다. 도달만 보고 판을 짜면 제일 약한 신호를 따라가게 된다.'));
+  const grow = el('div', 'calrow');
+  SIGNALS.forEach(s => {
+    const tot = d.output.reduce((sum, o) => sum + (+o[s.key] || 0), 0);
+    const c = el('div', 'calcell');
+    c.append(el('div', 'callab', `${s.rank}순위`));
+    const n = el('div', 'calnum', tot ? num(tot) : '—');
+    if (!tot) n.style.color = 'var(--faint)';
+    c.append(n);
+    c.append(el('div', 'calsub', `${s.emo} ${s.label}`));
+    grow.append(c);
+  });
+  gc.append(grow);
+  gc.append(el('div', 'next', sig.rank === 1
+    ? '공유가 적혀 있다 — 아래 비교는 전부 공유 기준이다.'
+    : `아직 ${sig.emo} ${sig.label}까지만 적혀 있다. 다음 게시물부터 공유 수를 적으면 비교 기준이 올라간다.`));
+
+  /* 형식별 — 무엇을 말했나가 아니라 어떤 틀에 담았나 */
+  const forms = byForm(d.output, sig);
+  if (!forms.length) {
+    gc.append(el('div', 'sechead', '형식 — 아직 아무것도 안 골랐다'));
+    gc.append(el('div', 'empty', '기록할 때 형식을 골라두지 않으면, 뭐가 통했는지 나중에 복원이 안 된다.'));
+    FORMS.forEach(([k, n, e, desc]) => {
+      const r = el('div', 'item');
+      r.append(el('div', 'aemo', e));
+      const g = el('div', 'grow');
+      g.append(el('div', 't', n));
+      g.append(el('div', 'm', desc));
+      r.append(g);
+      gc.append(r);
+    });
+  } else {
+    gc.append(el('div', 'sechead', `형식별 평균 ${sig.label}`));
+    const maxF = Math.max(1, ...forms.map(x => x.avg));
+    forms.forEach((r, i) => {
+      const solid = r.count >= 3;
+      bar(gc, `${r.e} ${r.n}${i === 0 && r.avg > 0 && solid ? '  👑' : ''}`, r.avg, maxF,
+        `${r.count}개 · 평균 ${num(r.avg)}${solid ? '' : ' · 표본 부족'}`);
+    });
+    const solid = forms.filter(x => x.count >= 3);
+    gc.append(el('div', 'need', solid.length >= 2
+      ? `${solid[0].e} ${josa(solid[0].n, '이', '가')} 앞선다 — 다음 세 개는 이 틀로.`
+      : '형식당 3개는 쌓여야 비교가 된다. 그 전까지는 취향이지 데이터가 아니다.'));
+  }
+
+  /* 검사지 검증 — 검사를 통과시킨 것이 실제로 더 퍼졌나 */
+  const he = hookEffect(d.output, sig);
+  if (he.ready) {
+    const up = he.passAvg - he.failAvg;
+    gc.append(el('div', 'sechead', '올리기 전 검사가 맞나'));
+    const hrow = el('div', 'calrow');
+    [[`${HOOK_PASS}개 이상 통과`, he.passAvg, `${he.pass}개`],
+     [`${HOOK_PASS}개 미만`, he.failAvg, `${he.fail}개`],
+     ['차이', up, up > 0 ? '검사가 맞다' : '검사가 틀렸다']].forEach(([lab, v, sub]) => {
+      const c = el('div', 'calcell');
+      c.append(el('div', 'callab', lab));
+      c.append(el('div', 'calnum', (v > 0 ? '' : v < 0 ? '−' : '') + num(Math.abs(v))));
+      c.append(el('div', 'calsub', sub));
+      hrow.append(c);
+    });
+    gc.append(hrow);
+    gc.append(el('div', 'need', up > 0
+      ? `검사를 통과시키고 올리면 ${josa(sig.label, '이', '가')} ${num(up)} 더 나온다. 다섯 줄 읽는 값은 한다.`
+      : '통과시킨 쪽이 더 안 퍼졌다. 다섯 줄이 이 무대에서는 틀린 검사다 — 항목을 바꿔야 한다.'));
+  }
+  view.append(gc);
+
   /* 무대 테스트 — 어디에 무기를 꽂을지 반응으로 고른다 */
   const ac = card('무대 테스트');
-  ac.append(el('div', 'empty', '무기는 정했으니 어디에 꽂을지를 찾는다. 산출량 대비 반응이 제일 좋은 무대가 답이다.'));
+  ac.append(el('div', 'empty',
+    `무기는 정했으니 어디에 꽂을지를 찾는다. 산출량 대비 ${josa(sig.label, '이', '가')} 제일 좋은 무대가 답이다.`));
   const used = ARENAS.filter(([k]) => d.output.some(o => o.arena === k));
   if (!used.length) {
     ac.append(el('div', 'empty', '아직 산출물이 없다. 무대 두세 개에 짧게 던져보는 것부터.'));
   } else {
     const rows = used.map(([k, n, e]) => {
       const list = d.output.filter(o => o.arena === k);
-      const reach = list.reduce((s, o) => s + (+o.reach || 0), 0);
-      return { k, n, e, count: list.length, reach, eff: list.length ? Math.round(reach / list.length) : 0 };
+      return { k, n, e, count: list.length, eff: avgBy(list, sig.key) };
     }).sort((a, b) => b.eff - a.eff);
     const maxEff = Math.max(1, ...rows.map(r => r.eff));
     rows.forEach((r, i) => {
       bar(ac, `${r.e} ${r.n}${i === 0 && r.eff > 0 ? '  👑' : ''}`, r.eff, maxEff,
-        `${r.count}개 · 평균 도달 ${num(r.eff)}`);
+        `${r.count}개 · 평균 ${sig.label} ${num(r.eff)}`);
     });
     if (rows[0].eff > 0) {
       ac.append(el('div', 'need', `지금까지는 ${rows[0].e} ${rows[0].n} 가 앞선다 — 표본이 쌓이면 여기 몰빵.`));
@@ -2652,17 +2841,16 @@ function viewBluelock(view, d) {
       const t = el('div', 't', o.title);
       t.style.whiteSpace = 'normal';
       g.append(t);
-      g.append(el('div', 'm', [o.date, ARENA[o.arena]?.name,
-        o.reach ? `도달 ${num(o.reach)}` : null, o.note].filter(Boolean).join(' · ')));
+      /* 신호는 센 것부터 적는다. 목록에서도 순서가 보여야 순서가 몸에 붙는다. */
+      const sigTxt = SIGNALS.filter(s => +o[s.key] > 0).map(s => `${s.emo} ${num(o[s.key])}`);
+      /* 무대는 왼쪽 아이콘이 이미 말한다 — 줄을 두 번 쓰지 않는다 */
+      g.append(el('div', 'm', [o.date, FORM[o.form]?.name, sigTxt.join(' ')].filter(Boolean).join(' · ')));
       it.append(g);
-      const ed = el('button', 'mini', '반응');
-      ed.onclick = () => {
-        const v = prompt(`"${o.title}" 도달 · 조회수`, o.reach || '');
-        if (v !== null) patch('output', o.id, { reach: v.trim() });
-      };
+      const ed = el('button', 'mini', '결과');
+      ed.onclick = () => openEdit(`결과 — ${o.title}`, RESULT_FIELDS, o, 'output');
       const del = el('button', 'mini danger', '×');
       del.onclick = () => remove('output', o.id, o.title);
-      it.append(ed, del);
+      it.append(ed, editBtn('산출물 수정', OUTPUT_EDIT_FIELDS, o, 'output'), del);
       lc.append(it);
     });
     view.append(lc);
@@ -2844,7 +3032,9 @@ function allRecords(d) {
     push(s.done_at, '과정', '🪜', s.title, g ? g.title : '', 'goals');
   });
   d.output.forEach(r => push(r.date, '산출물', '⚽', r.title,
-    [ARENA[r.arena]?.name, r.reach ? `도달 ${num(r.reach)}` : null, r.note].filter(Boolean).join(' · '), 'bluelock'));
+    [ARENA[r.arena]?.name, FORM[r.form]?.name,
+     ...SIGNALS.filter(s => +r[s.key] > 0).map(s => `${s.label} ${num(r[s.key])}`),
+     r.note].filter(Boolean).join(' · '), 'bluelock'));
   d.steal.forEach(r => push(r.created_at, '흡수', '🎣', `${r.target} — ${r.what}`,
     [r.how, r.used ? '써봄' : null].filter(Boolean).join(' · '), 'bluelock'));
   d.income.forEach(r => push(r.date, '수익', '💰', r.source,

@@ -41,7 +41,7 @@ const RESOURCES = {
                fields: ['date', 'kind', 'source', 'amount', 'note'] },
   output:    { table: 'me_output',        orderBy: 'date',
                fields: ['date', 'arena', 'title', 'url', 'reach', 'reactions', 'weapon_proof', 'note',
-                        'predicted_reach', 'predicted_why'] },
+                        'predicted_reach', 'predicted_why', 'shares', 'saves', 'form', 'hook_checks'] },
   steal:     { table: 'me_steal',         orderBy: 'created_at',
                fields: ['target', 'what', 'how', 'apply', 'used', 'result'] },
   cases:     { table: 'me_cases',         orderBy: 'created_at',
